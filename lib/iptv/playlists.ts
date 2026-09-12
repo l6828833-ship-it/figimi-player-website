@@ -167,9 +167,11 @@ export async function createDevicePlaylist(input: CreatePlaylistInput) {
     // out, and only fall back to fetching the link itself.
     const detected = xtreamLoginFromUrl(safeUrl);
     if (detected && await xtreamAuthWorks(detected)) {
+      // Only the login is verified here, not the whole catalogue: large panels cannot
+      // be rendered into one M3U, but they are still perfectly valid sources for a TV
+      // that speaks Xtream. Rendering is attempted later, per request.
       secret = { xtream: { ...detected, host: assertSafeUrl(detected.host, "Xtream host") } };
       storedType = "xtream";
-      await xtreamPlaylist(secret.xtream!);
     } else {
       secret = { sourceUrl: safeUrl };
       // Checked now so a dead or non-M3U link fails while the user is still looking at the form.
@@ -178,7 +180,7 @@ export async function createDevicePlaylist(input: CreatePlaylistInput) {
   } else {
     if (!input.host || !input.username || !input.password) throw new ApiError("Xtream host, username, and password are all required.", 400);
     secret = { xtream: { host: assertSafeUrl(input.host, "Xtream host"), username: input.username.trim(), password: input.password } };
-    await xtreamPlaylist(secret.xtream!);
+    if (!await xtreamAuthWorks(secret.xtream!)) throw new ApiError("That Xtream host, username, or password was rejected by the panel.", 400);
   }
 
   const client = createAdminClient();
@@ -216,6 +218,56 @@ export async function playlistContent(macValue: string, playlistId: string, acce
   const content = secret.content ? secret.content : secret.xtream ? await xtreamPlaylist(secret.xtream) : await fetchPlaylist(secret.sourceUrl || "");
   await client.from("iptv_device_playlists").update({ access_count: Number(row.access_count || 0) + 1, last_accessed_at: new Date().toISOString() }).eq("id", playlistId);
   return { content, name: row.name };
+}
+
+export type DeviceSource =
+  | { name: string; type: "m3u"; url: string }
+  | { name: string; type: "xtream"; host: string; username: string; password: string };
+
+/**
+ * What the TV app itself asks for: the playlist definitions for one device.
+ *
+ * This deliberately returns Xtream credentials, which the catalogue endpoints never
+ * do. The difference is the consumer — the device streams straight from the provider,
+ * so it genuinely needs the login; a browser does not. The caller has already proven
+ * it is that device by presenting its MAC and derived key, and the response is
+ * uncacheable and HTTPS-only.
+ *
+ * It exists because rendering a large panel into a single M3U is not viable: one real
+ * account produces roughly 52 MB, far beyond a serverless response limit. Handing the
+ * source to a client that already speaks Xtream avoids the conversion entirely.
+ */
+export async function deviceSources(macValue: string): Promise<DeviceSource[]> {
+  const mac = normalizeMac(macValue);
+  const client = createAdminClient();
+  const { data: rows, error } = await client
+    .from("iptv_device_playlists")
+    .select("id,name,source_type,enabled,sort_order,created_at")
+    .eq("device_mac", mac)
+    .eq("enabled", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  if (!rows?.length) return [];
+
+  const { data: secrets, error: secretError } = await client
+    .from("iptv_device_playlist_secrets")
+    .select("playlist_id,ciphertext,iv,auth_tag,key_version")
+    .in("playlist_id", rows.map((row) => row.id));
+  if (secretError) throw secretError;
+  const byId = new Map((secrets || []).map((row) => [row.playlist_id, row]));
+
+  const sources: DeviceSource[] = [];
+  for (const row of rows) {
+    const encrypted = byId.get(row.id);
+    if (!encrypted) continue;
+    const secret = decryptJson<PlaylistSecret>({ ciphertext: encrypted.ciphertext, iv: encrypted.iv, authTag: encrypted.auth_tag, keyVersion: encrypted.key_version });
+    if (secret.xtream) sources.push({ name: row.name, type: "xtream", ...secret.xtream });
+    else if (secret.sourceUrl) sources.push({ name: row.name, type: "m3u", url: secret.sourceUrl });
+    // An uploaded file has no URL the TV can fetch directly, so it is served through
+    // the M3U endpoint instead and is intentionally absent here.
+  }
+  return sources;
 }
 
 /** Scoped by MAC when a device is acting, so a session can only touch its own playlists. */
