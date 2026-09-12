@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyDeviceKey } from "@/lib/iptv/device-key";
+import { deviceSummary } from "@/lib/iptv/devices";
 import { deviceSources } from "@/lib/iptv/playlists";
 import { ApiError, normalizeMac } from "@/lib/iptv/mac";
 import { apiError, readJson } from "@/lib/iptv/respond";
@@ -23,7 +24,17 @@ export async function POST(request: Request) {
     const input = schema.parse(await readJson(request));
     const mac = normalizeMac(input.mac);
     if (!verifyDeviceKey(mac, input.deviceKey)) throw new ApiError("That device key does not match this MAC address.", 401);
-    return NextResponse.json({ mac, sources: await deviceSources(mac) }, { headers: { "Cache-Control": "no-store" } });
+
+    const device = await deviceSummary(mac);
+    if (device.disabled) throw new ApiError("This device has been disabled.", 403);
+    // An expired subscription returns the status without sources, so the TV can show
+    // "renew" rather than a generic empty screen.
+    const sources = device.expired ? [] : await deviceSources(mac);
+    return NextResponse.json({
+      mac,
+      subscription: { plan: device.plan, expiresAt: device.subscriptionExpiresAt, daysRemaining: device.daysRemaining, expired: device.expired },
+      sources,
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return apiError(error);
   }

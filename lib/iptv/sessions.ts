@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyDeviceKey } from "./device-key";
+import { TRIAL_DAYS } from "./devices";
 import { ApiError, normalizeMac } from "./mac";
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -32,8 +33,22 @@ export async function loginDevice(macValue: string, deviceKey: string): Promise<
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
   const { error } = await client.from("iptv_device_sessions").insert({ token_hash: hashToken(token), device_mac: mac, expires_at: expiresAt });
   if (error) throw error;
+
+  const now = new Date().toISOString();
+  // A device seen for the first time starts its trial now, so the dashboard has a real
+  // term to display and a paid plan set later by an admin is never overwritten here.
+  const firstTime = !device;
   await client.from("iptv_devices").upsert(
-    { device_mac: mac, last_login_at: new Date().toISOString(), login_count: Number(device?.login_count || 0) + 1, failed_attempts: 0, locked_until: null },
+    {
+      device_mac: mac,
+      last_login_at: now,
+      login_count: Number(device?.login_count || 0) + 1,
+      failed_attempts: 0,
+      locked_until: null,
+      ...(firstTime
+        ? { plan: "trial", activated_at: now, subscription_expires_at: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString() }
+        : {}),
+    },
     { onConflict: "device_mac" },
   );
   await client.from("iptv_device_sessions").delete().lt("expires_at", new Date().toISOString());

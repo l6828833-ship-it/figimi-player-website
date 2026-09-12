@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptJson, encryptJson } from "./crypto";
 import { ApiError, normalizeMac } from "./mac";
+import { isExpired } from "./devices";
 import { xtreamAuthWorks, xtreamLoginFromUrl, xtreamPlaylist, type XtreamLogin } from "./xtream";
 
 export const MAX_PLAYLIST_BYTES = 10 * 1024 * 1024;
@@ -23,11 +24,12 @@ export type DevicePlaylistRow = {
   access_count: number;
   access_token: string;
   last_accessed_at: string | null;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 };
 
-const fields = "id,device_mac,name,source_type,enabled,sort_order,access_count,access_token,last_accessed_at,created_at,updated_at";
+const fields = "id,device_mac,name,source_type,enabled,sort_order,access_count,access_token,last_accessed_at,expires_at,created_at,updated_at";
 
 /** The access token is what keeps the TV URL unguessable, so it is only ever returned to the signed-in device. */
 export const publicPlaylist = (row: DevicePlaylistRow) => ({
@@ -38,6 +40,8 @@ export const publicPlaylist = (row: DevicePlaylistRow) => ({
   enabled: row.enabled,
   access_count: row.access_count,
   last_accessed_at: row.last_accessed_at,
+  expires_at: row.expires_at,
+  expired: Boolean(row.expires_at && new Date(row.expires_at).getTime() <= Date.now()),
   created_at: row.created_at,
   playlistPath: `/api/devices/${encodeURIComponent(row.device_mac)}/playlists/${encodeURIComponent(row.id)}/playlist.m3u?key=${encodeURIComponent(row.access_token)}`,
 });
@@ -210,10 +214,11 @@ export async function playlistContent(macValue: string, playlistId: string, acce
   // Rejected before touching the database: a request with no token can never succeed.
   if (!accessToken) throw new ApiError("Playlist not found.", 404);
   const client = createAdminClient();
-  const { data: row, error } = await client.from("iptv_device_playlists").select("id,name,enabled,access_count,access_token").eq("id", playlistId).eq("device_mac", mac).maybeSingle();
+  const { data: row, error } = await client.from("iptv_device_playlists").select("id,name,enabled,access_count,access_token,expires_at").eq("id", playlistId).eq("device_mac", mac).maybeSingle();
   if (error) throw error;
   // A wrong token is reported as "not found" so the endpoint reveals nothing about which IDs exist.
   if (!row || !row.enabled || !accessToken || row.access_token !== accessToken) throw new ApiError("Playlist not found.", 404);
+  if (isExpired(row.expires_at as string | null)) throw new ApiError("This playlist has expired. Renew it to keep watching.", 410);
 
   const { data: secretRow, error: secretError } = await client.from("iptv_device_playlist_secrets").select("ciphertext,iv,auth_tag,key_version").eq("playlist_id", playlistId).single();
   if (secretError || !secretRow) throw new Error("The playlist source is missing.");
@@ -246,23 +251,24 @@ export async function deviceSources(macValue: string): Promise<DeviceSource[]> {
   const client = createAdminClient();
   const { data: rows, error } = await client
     .from("iptv_device_playlists")
-    .select("id,name,source_type,enabled,sort_order,created_at")
+    .select("id,name,source_type,enabled,sort_order,expires_at,created_at")
     .eq("device_mac", mac)
     .eq("enabled", true)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw error;
-  if (!rows?.length) return [];
+  const live = (rows || []).filter((row) => !isExpired(row.expires_at as string | null));
+  if (!live.length) return [];
 
   const { data: secrets, error: secretError } = await client
     .from("iptv_device_playlist_secrets")
     .select("playlist_id,ciphertext,iv,auth_tag,key_version")
-    .in("playlist_id", rows.map((row) => row.id));
+    .in("playlist_id", live.map((row) => row.id));
   if (secretError) throw secretError;
   const byId = new Map((secrets || []).map((row) => [row.playlist_id, row]));
 
   const sources: DeviceSource[] = [];
-  for (const row of rows) {
+  for (const row of live) {
     const encrypted = byId.get(row.id);
     if (!encrypted) continue;
     const secret = decryptJson<PlaylistSecret>({ ciphertext: encrypted.ciphertext, iv: encrypted.iv, authTag: encrypted.auth_tag, keyVersion: encrypted.key_version });
@@ -272,6 +278,65 @@ export async function deviceSources(macValue: string): Promise<DeviceSource[]> {
     // the M3U endpoint instead and is intentionally absent here.
   }
   return sources;
+}
+
+export type UpdatePlaylistInput = {
+  name?: string;
+  sourceUrl?: string;
+  host?: string;
+  username?: string;
+  password?: string;
+};
+
+/**
+ * Renames a playlist and/or replaces its source, re-verifying whatever is supplied.
+ *
+ * The source is only touched when new values arrive, so a rename never forces the
+ * user to retype an Xtream password they cannot see.
+ */
+export async function updateDevicePlaylist(id: string, input: UpdatePlaylistInput, macValue: string) {
+  const mac = normalizeMac(macValue);
+  const client = createAdminClient();
+
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) {
+    const name = input.name.trim().replace(/\s+/g, " ");
+    if (!name || name.length > 120) throw new ApiError("Playlist name must be between 1 and 120 characters.", 400);
+    patch.name = name;
+  }
+
+  let secret: PlaylistSecret | null = null;
+  let storedType: "url" | "xtream" | null = null;
+  if (input.sourceUrl) {
+    const safeUrl = assertSafeUrl(input.sourceUrl, "playlist link");
+    const detected = xtreamLoginFromUrl(safeUrl);
+    if (detected && await xtreamAuthWorks(detected)) { secret = { xtream: { ...detected, host: assertSafeUrl(detected.host, "Xtream host") } }; storedType = "xtream"; }
+    else { await fetchPlaylist(safeUrl); secret = { sourceUrl: safeUrl }; storedType = "url"; }
+  } else if (input.host || input.username || input.password) {
+    if (!input.host || !input.username || !input.password) throw new ApiError("Xtream host, username, and password are all required to change the login.", 400);
+    const xtream = { host: assertSafeUrl(input.host, "Xtream host"), username: input.username.trim(), password: input.password };
+    if (!await xtreamAuthWorks(xtream)) throw new ApiError("That Xtream host, username, or password was rejected by the panel.", 400);
+    secret = { xtream };
+    storedType = "xtream";
+  }
+  if (storedType) patch.source_type = storedType;
+  if (!Object.keys(patch).length) throw new ApiError("Nothing to change.", 400);
+
+  const { data, error } = await client.from("iptv_device_playlists").update(patch).eq("id", id).eq("device_mac", mac).select(fields).maybeSingle();
+  if (error) {
+    if (error.code === "23505") throw new ApiError("This device already has a playlist with that name.", 409);
+    throw error;
+  }
+  if (!data) throw new ApiError("Playlist not found.", 404);
+
+  if (secret) {
+    const encrypted = encryptJson(secret);
+    const { error: secretError } = await client
+      .from("iptv_device_playlist_secrets")
+      .upsert({ playlist_id: id, ciphertext: encrypted.ciphertext, iv: encrypted.iv, auth_tag: encrypted.authTag, key_version: encrypted.keyVersion }, { onConflict: "playlist_id" });
+    if (secretError) throw secretError;
+  }
+  return publicPlaylist(data as DevicePlaylistRow);
 }
 
 /** Scoped by MAC when a device is acting, so a session can only touch its own playlists. */
