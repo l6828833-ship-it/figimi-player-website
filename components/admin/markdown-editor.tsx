@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+export function MarkdownEditor({ name = "body", defaultValue = "", label = "Content", required = true, hint = "Markdown supported: headings, links, lists, tables, emphasis, and images." }: { name?: string; defaultValue?: string; label?: string; required?: boolean; hint?: string }) { const [value, setValue] = useState(defaultValue), [preview, setPreview] = useState(false); return <div className="markdown-editor"><div className="editor-heading"><strong>{label}</strong><div><button type="button" className={!preview ? "active" : ""} onClick={() => setPreview(false)}>Write</button><button type="button" className={preview ? "active" : ""} onClick={() => setPreview(true)}>Preview</button></div></div>{preview ? <div className="markdown preview"><ReactMarkdown remarkPlugins={[remarkGfm]}>{value || "Nothing to preview yet."}</ReactMarkdown></div> : <textarea name={name} value={value} onChange={(e) => setValue(e.target.value)} rows={18} required={required} />}<small>{hint}</small></div>; }

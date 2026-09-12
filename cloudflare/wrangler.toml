@@ -1,0 +1,18 @@
+# Optional: deploy the media proxy Worker with the Wrangler CLI.
+# (You can also just paste media-proxy-worker.js into the Cloudflare dashboard.)
+#
+#   npm i -g wrangler
+#   wrangler login
+#   wrangler deploy
+#
+# Then in the dashboard add media.figimi.com as a Custom Domain for this Worker
+# (Workers & Pages -> figimi-media-proxy -> Settings -> Domains & Routes).
+
+name = "figimi-media-proxy"
+main = "media-proxy-worker.js"
+compatibility_date = "2026-07-22"
+
+# Your Supabase project origin, no trailing slash. Find it in
+# Supabase -> Project Settings -> API -> Project URL.
+[vars]
+SUPABASE_ORIGIN = "https://YOUR-PROJECT-REF.supabase.co"

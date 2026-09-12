@@ -1,0 +1,18 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+.env.*.local
+!.env.example
+coverage/
+*.log
+.DS_Store
+.tmp/
+tmp/
+public/uploads/
+*.tsbuildinfo
+
+# The old separate Cloud Run backend built output; the API now runs inside this app.
+backend/dist/
+backend/node_modules/
