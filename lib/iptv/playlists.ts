@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptJson, encryptJson } from "./crypto";
 import { ApiError, normalizeMac } from "./mac";
-import { xtreamPlaylist, type XtreamLogin } from "./xtream";
+import { xtreamAuthWorks, xtreamLoginFromUrl, xtreamPlaylist, type XtreamLogin } from "./xtream";
 
 export const MAX_PLAYLIST_BYTES = 10 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -157,11 +157,24 @@ export async function createDevicePlaylist(input: CreatePlaylistInput) {
   if (!name || name.length > 120) throw new ApiError("Playlist name must be between 1 and 120 characters.", 400);
 
   let secret: PlaylistSecret;
+  let storedType: "url" | "xtream" = input.sourceType;
   if (input.sourceType === "url") {
     if (!input.sourceUrl) throw new ApiError("Enter an M3U playlist link.", 400);
-    secret = { sourceUrl: assertSafeUrl(input.sourceUrl, "playlist link") };
-    // Checked now so a dead or non-M3U link fails while the user is still looking at the form.
-    await fetchPlaylist(secret.sourceUrl!);
+    const safeUrl = assertSafeUrl(input.sourceUrl, "playlist link");
+
+    // A panel's get.php link carries its own credentials. Some panels block that
+    // endpoint while their API works, so prefer the API whenever the login checks
+    // out, and only fall back to fetching the link itself.
+    const detected = xtreamLoginFromUrl(safeUrl);
+    if (detected && await xtreamAuthWorks(detected)) {
+      secret = { xtream: { ...detected, host: assertSafeUrl(detected.host, "Xtream host") } };
+      storedType = "xtream";
+      await xtreamPlaylist(secret.xtream!);
+    } else {
+      secret = { sourceUrl: safeUrl };
+      // Checked now so a dead or non-M3U link fails while the user is still looking at the form.
+      await fetchPlaylist(safeUrl);
+    }
   } else {
     if (!input.host || !input.username || !input.password) throw new ApiError("Xtream host, username, and password are all required.", 400);
     secret = { xtream: { host: assertSafeUrl(input.host, "Xtream host"), username: input.username.trim(), password: input.password } };
@@ -171,7 +184,7 @@ export async function createDevicePlaylist(input: CreatePlaylistInput) {
   const client = createAdminClient();
   const { data: row, error } = await client
     .from("iptv_device_playlists")
-    .insert({ device_mac: mac, name, source_type: input.sourceType, sort_order: 0, access_token: randomBytes(16).toString("hex") })
+    .insert({ device_mac: mac, name, source_type: storedType, sort_order: 0, access_token: randomBytes(16).toString("hex") })
     .select(fields)
     .single();
   if (error || !row) {
