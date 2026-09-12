@@ -70,19 +70,46 @@ function assertSafeUrl(value: string, label: string): string {
   return parsed.toString();
 }
 
+const MAX_REDIRECTS = 5;
+
+/**
+ * Fetches a playlist link, following redirects by hand.
+ *
+ * Real IPTV panels — the `get.php` style especially — almost always 302 to the
+ * actual playlist, so redirects have to be followed. But following them blindly is
+ * an SSRF hole: a redirect could point at an internal address. So each hop is
+ * re-checked with the same public-only rules as the first URL, and the chain is
+ * capped. Redirects are resolved manually rather than with `redirect: "follow"`
+ * precisely so every intermediate location passes that check.
+ */
 async function fetchPlaylist(url: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(assertSafeUrl(url, "playlist link"), {
-      redirect: "manual",
-      signal: controller.signal,
-      cache: "no-store",
-      headers: { Accept: "audio/x-mpegurl, application/vnd.apple.mpegurl, text/plain, */*" },
-    });
-    if (response.status >= 300 && response.status < 400) throw new ApiError("Redirecting links are not accepted. Use the final playlist URL.", 400);
+    let current = assertSafeUrl(url, "playlist link");
+    let response: Response | null = null;
+
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+      response = await fetch(current, {
+        redirect: "manual",
+        signal: controller.signal,
+        cache: "no-store",
+        headers: { Accept: "audio/x-mpegurl, application/vnd.apple.mpegurl, text/plain, */*", "User-Agent": "VLC/3.0.20 LibVLC/3.0.20" },
+      });
+      // 3xx (and the opaque status 0 fetch reports for a cross-origin manual
+      // redirect) both mean "follow the Location header".
+      const isRedirect = (response.status >= 300 && response.status < 400) || response.status === 0;
+      if (!isRedirect) break;
+      const location = response.headers.get("location");
+      if (!location) break;
+      if (hop === MAX_REDIRECTS) throw new ApiError("The playlist link redirected too many times.", 400);
+      current = assertSafeUrl(new URL(location, current).toString(), "playlist link");
+    }
+
+    if (!response) throw new ApiError("The playlist link could not be reached.", 400);
     if (!response.ok) throw new ApiError(`The playlist link returned HTTP ${response.status}.`, 400);
     if (Number(response.headers.get("content-length") || 0) > MAX_PLAYLIST_BYTES) throw new ApiError("That playlist is larger than 10 MB.", 413);
+
     const reader = response.body?.getReader();
     if (!reader) return assertM3u(await response.text());
     // Streamed so a server that lies about content-length still cannot exhaust memory.
