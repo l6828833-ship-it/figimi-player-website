@@ -183,6 +183,11 @@ export async function createDevicePlaylist(input: CreatePlaylistInput) {
     if (!await xtreamAuthWorks(secret.xtream!)) throw new ApiError("That Xtream host, username, or password was rejected by the panel.", 400);
   }
 
+  // Encrypted before anything is written. Doing it after the insert left an orphan
+  // playlist row whenever encryption failed, and that row then blocked the name with
+  // a "already exists" conflict on every retry.
+  const encrypted = encryptJson(secret);
+
   const client = createAdminClient();
   const { data: row, error } = await client
     .from("iptv_device_playlists")
@@ -193,7 +198,6 @@ export async function createDevicePlaylist(input: CreatePlaylistInput) {
     if (error?.code === "23505") throw new ApiError("This device already has a playlist with that name.", 409);
     throw error || new Error("Could not create the playlist.");
   }
-  const encrypted = encryptJson(secret);
   const { error: secretError } = await client
     .from("iptv_device_playlist_secrets")
     .insert({ playlist_id: row.id, ciphertext: encrypted.ciphertext, iv: encrypted.iv, auth_tag: encrypted.authTag, key_version: encrypted.keyVersion });
