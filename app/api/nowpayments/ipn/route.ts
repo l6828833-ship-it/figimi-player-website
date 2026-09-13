@@ -7,7 +7,7 @@ import { verifyIpnSignature, PAID_STATUSES } from "@/lib/nowpayments";
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json() as Record<string, unknown>;
     const signature = request.headers.get("x-nowpayments-sig") || undefined;
 
     // Verify webhook signature
@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const paymentStatus: string = body.payment_status || "";
-    const orderId: string = body.order_id || "";
-    const paymentId: string = body.payment_id || "";
+    const paymentStatus: string = String(body.payment_status || "");
+    const orderId: string = String(body.order_id || "");
+    const paymentId: string = String(body.payment_id || "");
 
     console.log("[IPN] Received payment notification:", {
       orderId,
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[IPN] Processing error:", error);
     return NextResponse.json(
       { error: "IPN processing failed" },

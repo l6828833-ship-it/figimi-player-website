@@ -21,10 +21,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ payment });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[API] Create payment error:", error);
+    const message = error instanceof Error ? error.message : "Failed to create payment";
     return NextResponse.json(
-      { error: error?.message || "Failed to create payment" },
+      { error: message },
       { status: 500 }
     );
   }
