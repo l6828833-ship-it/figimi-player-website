@@ -462,20 +462,22 @@ export function DevicePlaylistManager() {
             </div>
           ) : (
             <div className="fp-payment-methods">
-              <button 
-                className="fp-button ghost" 
-                type="button" 
-                onClick={() => {
-                  setShowPaymentMethods(false);
-                  setSelectedPlan(null);
-                }}
-              >
-                ← Back to Plans
-              </button>
+              <div className="fp-payment-header">
+                <button 
+                  className="fp-button ghost small" 
+                  type="button" 
+                  onClick={() => {
+                    setShowPaymentMethods(false);
+                    setSelectedPlan(null);
+                  }}
+                >
+                  ← Back to Plans
+                </button>
+              </div>
               <div className="fp-selected-plan-info">
                 <p>Selected: <strong>{pricingPlans.find(p => p.id === selectedPlan)?.duration}</strong> - <strong>{pricingPlans.find(p => p.id === selectedPlan)?.price}</strong></p>
               </div>
-              <h4>Choose Payment Method</h4>
+              <h4 className="fp-payment-title">Choose Payment Method</h4>
               <div className="fp-payment-grid">
                 {paymentMethods.map((method) => (
                   <button

@@ -373,11 +373,15 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
   width: 90%;
 }
 
+.fp-buy-modal .fp-modal-body {
+  padding: 24px;
+}
+
 .fp-pricing-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .fp-pricing-card {
@@ -457,7 +461,17 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
 
 /* Payment methods */
 .fp-payment-methods {
-  margin-top: 16px;
+  margin-top: 0;
+}
+
+.fp-payment-header {
+  margin-bottom: 16px;
+}
+
+.fp-payment-header .fp-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .fp-selected-plan-info {
@@ -471,47 +485,56 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
 .fp-selected-plan-info p {
   margin: 0;
   color: var(--ink);
+  font-size: 1.05rem;
 }
 
-.fp-payment-methods h4 {
-  margin: 20px 0 16px;
+.fp-payment-title {
+  margin: 24px 0 16px;
   text-align: center;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .fp-payment-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-top: 16px;
 }
 
 .fp-payment-card {
-  padding: 28px 20px;
+  padding: 32px 20px;
   border: 2px solid var(--line);
   border-radius: 14px;
   background: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
   transition: all 0.2s;
+  text-align: center;
 }
 
 .fp-payment-card:hover {
   border-color: var(--purple);
+  background: var(--purple-soft);
   box-shadow: 0 4px 12px rgba(105, 87, 217, 0.15);
   transform: translateY(-2px);
 }
 
 .fp-payment-icon {
-  font-size: 2.5rem;
+  font-size: 3rem;
   line-height: 1;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .fp-payment-name {
   font-weight: 700;
+  font-size: 0.95rem;
   color: var(--ink);
 }
 
@@ -528,5 +551,19 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
     width: 95%;
     max-height: 85vh;
     overflow-y: auto;
+  }
+  
+  .fp-buy-modal .fp-modal-body {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 768px) and (min-width: 621px) {
+  .fp-pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .fp-payment-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
