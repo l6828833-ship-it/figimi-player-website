@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DevicePlaylistManager } from "@/components/device-playlist-manager";
 import { IptvFooter, IptvHeader } from "@/components/iptv-chrome";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "My playlists",
