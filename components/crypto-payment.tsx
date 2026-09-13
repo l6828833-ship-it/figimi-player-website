@@ -123,6 +123,8 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
     setTimeout(() => setCopied(""), 2000);
   };
 
+  const selectedCurrencyDetails = currencies.find((currency) => currency.ticker === selectedCurrency);
+
   if (isPaid) {
     return (
       <div className="fp-crypto-payment">
@@ -248,37 +250,45 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
           </div>
         ) : (
           <>
-            <div className="fp-currency-grid">
-              {currencies.map((currency) => (
-                <button
-                  key={currency.ticker}
-                  className={`fp-currency-card ${selectedCurrency === currency.ticker ? "selected" : ""}`}
-                  onClick={() => setSelectedCurrency(currency.ticker)}
-                >
-                  {currency.logoUrl ? (
-                    <Image
-                      src={currency.logoUrl}
-                      alt={currency.name}
-                      width={40}
-                      height={40}
-                      className="fp-currency-logo"
-                    />
-                  ) : (
-                    <div className="fp-currency-placeholder" />
-                  )}
-                  <div className="fp-currency-info">
-                    <span className="fp-currency-name">{currency.name}</span>
-                    {currency.network && (
-                      <span className="fp-currency-network">{currency.network}</span>
-                    )}
-                    <span className="fp-currency-ticker">{currency.ticker.toUpperCase()}</span>
-                  </div>
-                  {selectedCurrency === currency.ticker && (
-                    <CheckCircle2 size={20} className="fp-currency-check" />
-                  )}
-                </button>
-              ))}
+            <div className="fp-currency-select-group">
+              <label htmlFor="fp-currency-select">Coin / network</label>
+              <select
+                id="fp-currency-select"
+                className="fp-currency-select"
+                value={selectedCurrency}
+                onChange={(event) => setSelectedCurrency(event.target.value)}
+              >
+                <option value="">Choose a coin and network</option>
+                {currencies.map((currency) => (
+                  <option key={currency.ticker} value={currency.ticker}>
+                    {currency.name}{currency.network ? ` (${currency.network})` : ""} · {currency.ticker.toUpperCase()}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            {selectedCurrencyDetails && (
+              <div className="fp-selected-currency">
+                {selectedCurrencyDetails.logoUrl ? (
+                  <Image
+                    src={selectedCurrencyDetails.logoUrl}
+                    alt=""
+                    width={42}
+                    height={42}
+                    className="fp-currency-logo"
+                  />
+                ) : (
+                  <div className="fp-currency-placeholder" />
+                )}
+                <div className="fp-currency-info">
+                  <span className="fp-currency-name">{selectedCurrencyDetails.name}</span>
+                  {selectedCurrencyDetails.network && (
+                    <span className="fp-currency-network">{selectedCurrencyDetails.network}</span>
+                  )}
+                  <span className="fp-currency-ticker">{selectedCurrencyDetails.ticker.toUpperCase()}</span>
+                </div>
+              </div>
+            )}
 
             <button
               className="fp-button primary wide"

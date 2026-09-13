@@ -6,7 +6,7 @@ This document explains how to set up and use the NOWPayments crypto payment syst
 
 The integration allows users to pay for subscriptions using cryptocurrency. The payment flow is:
 
-1. User selects a subscription plan (1 month, 6 months, 12 months, or lifetime)
+1. User selects a subscription plan (6 months for $6.99, 12 months for $12.99, or lifetime for $19.99)
 2. User chooses "Cryptocurrency" as payment method
 3. User selects their preferred cryptocurrency and network
 4. System generates a payment address and QR code
@@ -122,10 +122,9 @@ Update pricing in `/components/device-playlist-manager.tsx`:
 
 ```typescript
 const pricingPlans = [
-  { id: "1month", duration: "1 Month", price: "$3", originalPrice: null },
-  { id: "6months", duration: "6 Months", price: "$6", originalPrice: null },
-  { id: "12months", duration: "12 Months", price: "$8", originalPrice: null },
-  { id: "lifetime", duration: "Lifetime", price: "$20", originalPrice: "$30" },
+  { id: "6months", duration: "6 Months", amount: 6.99, originalAmount: null },
+  { id: "12months", duration: "12 Months", amount: 12.99, originalAmount: null },
+  { id: "lifetime", duration: "Lifetime", amount: 19.99, originalAmount: 30 },
 ];
 ```
 

@@ -75,7 +75,7 @@ export function DevicePlaylistManager() {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Playlist | null>(null);
   const [showBuySubscription, setShowBuySubscription] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<"1month" | "6months" | "12months" | "lifetime" | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<"6months" | "12months" | "lifetime" | null>(null);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
   const [showCryptoPayment, setShowCryptoPayment] = useState(false);
 
@@ -282,11 +282,18 @@ export function DevicePlaylistManager() {
   const expiring = device?.daysRemaining !== null && device?.daysRemaining !== undefined && device.daysRemaining <= 3 && !device.expired;
 
   const pricingPlans = [
-    { id: "1month" as const, duration: "1 Month", price: "$3", originalPrice: null },
-    { id: "6months" as const, duration: "6 Months", price: "$6", originalPrice: null },
-    { id: "12months" as const, duration: "12 Months", price: "$8", originalPrice: null },
-    { id: "lifetime" as const, duration: "Lifetime", price: "$20", originalPrice: "$30" },
+    { id: "6months" as const, duration: "6 Months", amount: 6.99, originalAmount: null },
+    { id: "12months" as const, duration: "12 Months", amount: 12.99, originalAmount: null },
+    { id: "lifetime" as const, duration: "Lifetime", amount: 19.99, originalAmount: 30 },
   ];
+
+  const formatPrice = (amount: number) => {
+    const [whole, cents] = amount.toFixed(2).split(".");
+    return <><span className="fp-price-whole">${whole}</span><span className="fp-price-cents">.{cents}</span></>;
+  };
+
+  const formatPriceText = (amount: number) => Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
+  const selectedPlanDetails = pricingPlans.find((plan) => plan.id === selectedPlan);
 
   const paymentMethods: PaymentMethod[] = [
     { 
@@ -326,7 +333,7 @@ export function DevicePlaylistManager() {
       // For card and PayPal, show a placeholder for now
       const plan = pricingPlans.find(p => p.id === selectedPlan);
       const method = paymentMethods.find(m => m.id === methodId);
-      alert(`Selected: ${plan?.duration} (${plan?.price}) via ${method?.name}\n\nPayment processing will be implemented here.`);
+      alert(`Selected: ${plan?.duration} (${plan ? formatPriceText(plan.amount) : ""}) via ${method?.name}\n\nPayment processing will be implemented here.`);
     }
   };
 
@@ -489,9 +496,9 @@ export function DevicePlaylistManager() {
                     {plan.id === "lifetime" && <span className="fp-badge">Best Value</span>}
                   </div>
                   <div className="fp-pricing-price">
-                    <span className="fp-price-main">{plan.price}</span>
-                    {plan.originalPrice && (
-                      <span className="fp-price-original">{plan.originalPrice}</span>
+                    <span className="fp-price-main">{formatPrice(plan.amount)}</span>
+                    {plan.originalAmount && (
+                      <span className="fp-price-original">{formatPriceText(plan.originalAmount)}</span>
                     )}
                   </div>
                   <button 
@@ -510,7 +517,7 @@ export function DevicePlaylistManager() {
           ) : (
             <div className="fp-payment-methods">
               <div className="fp-selected-plan-info">
-                <p>Selected: <strong>{pricingPlans.find(p => p.id === selectedPlan)?.duration}</strong> - <strong>{pricingPlans.find(p => p.id === selectedPlan)?.price}</strong></p>
+                <p>Selected: <strong>{selectedPlanDetails?.duration}</strong> - <strong className="fp-inline-price">{selectedPlanDetails ? formatPrice(selectedPlanDetails.amount) : ""}</strong></p>
               </div>
               <h4 className="fp-payment-title">Choose Payment Method</h4>
               <div className="fp-payment-grid">
@@ -573,7 +580,7 @@ export function DevicePlaylistManager() {
           <CryptoPayment
             deviceMac={session.mac}
             planId={selectedPlan}
-            amount={Number(pricingPlans.find(p => p.id === selectedPlan)?.price.replace('$', '') || 0)}
+            amount={pricingPlans.find(p => p.id === selectedPlan)?.amount || 0}
             onClose={closeBuyModal}
             onSuccess={handleCryptoSuccess}
           />
