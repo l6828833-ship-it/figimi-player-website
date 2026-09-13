@@ -28,15 +28,27 @@ export async function POST(request: Request) {
     // First contact from the app starts the trial, so the 7 days count from real first
     // use and cannot be reset by reinstalling.
     const { blocked } = await touchDevice(mac);
-    if (blocked) throw new ApiError("This device has been blocked. Contact support.", 403);
 
-    const device = await deviceSummary(mac);
-    if (device.disabled) throw new ApiError("This device has been blocked. Contact support.", 403);
+    const device = blocked ? null : await deviceSummary(mac);
+    // A block is answered with a flag the app can act on, not just a message. The TV has
+    // playlists cached locally, so it has to be told "you are blocked" explicitly to
+    // clear them and lock itself; a bare 403 was indistinguishable from a bad network
+    // and left a blocked device playing from its cache.
+    if (blocked || device?.disabled) {
+      return NextResponse.json({
+        mac,
+        blocked: true,
+        sources: [],
+        error: "This device has been blocked. Contact support.",
+      }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    if (!device) throw new ApiError("This device could not be read.", 500);
     // An expired subscription returns the status without sources, so the TV can show
     // "renew" rather than a generic empty screen.
     const sources = device.expired ? [] : await deviceSources(mac);
     return NextResponse.json({
       mac,
+      blocked: false,
       subscription: { plan: device.plan, expiresAt: device.subscriptionExpiresAt, daysRemaining: device.daysRemaining, expired: device.expired },
       sources,
     }, { headers: { "Cache-Control": "no-store" } });

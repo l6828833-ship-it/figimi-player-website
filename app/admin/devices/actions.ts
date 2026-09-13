@@ -3,17 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import {
-  createDevice,
-  deleteDevice,
-  expireNow,
-  extendDays,
-  extendSubscription,
-  setBlocked,
-  setLabel,
-  setLifetime,
-  setNotes,
-} from "@/lib/iptv/admin-devices";
+import { createDevice, deleteDevice, expireNow, extendDays, extendSubscription, setBlocked, setLabel, setLifetime, setNotes } from "@/lib/iptv/admin-devices";
 
 const text = (form: FormData, name: string) => String(form.get(name) || "").trim();
 
@@ -37,26 +27,23 @@ const done = (form: FormData, query: string) => {
 const fail = (form: FormData, error: unknown, fallback: string) =>
   redirect(`${target(form)}?error=${encodeURIComponent(error instanceof Error ? error.message : fallback)}`);
 
-export async function extendSubscriptionAction(form: FormData) {
+/**
+ * One action behind the extend stepper, in months or days.
+ *
+ * It only ever adds time. Reducing a term stays on "End now", so a mistyped number can
+ * never quietly cut a paying customer short.
+ */
+export async function extendTermAction(form: FormData) {
   await requireAdmin();
-  const months = Number(text(form, "months"));
+  const amount = Number(text(form, "amount"));
+  const unit = text(form, "unit") === "days" ? "days" : "months";
   try {
-    await extendSubscription(text(form, "mac"), months);
+    if (unit === "days") await extendDays(text(form, "mac"), amount);
+    else await extendSubscription(text(form, "mac"), amount);
   } catch (error) {
     fail(form, error, "Could not extend the subscription.");
   }
-  done(form, `extended=${encodeURIComponent(String(months))}`);
-}
-
-export async function extendDaysAction(form: FormData) {
-  await requireAdmin();
-  const days = Number(text(form, "days"));
-  try {
-    await extendDays(text(form, "mac"), days);
-  } catch (error) {
-    fail(form, error, "Could not add days to the subscription.");
-  }
-  done(form, `days=${encodeURIComponent(String(days))}`);
+  done(form, `${unit === "days" ? "days" : "extended"}=${encodeURIComponent(String(amount))}`);
 }
 
 export async function setLifetimeAction(form: FormData) {

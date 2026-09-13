@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AlertTriangle, Ban, CalendarClock, MonitorSmartphone, Wallet } from "lucide-react";
 import { listDevices, matchesFilter } from "@/lib/iptv/admin-devices";
 import { listPayments, summarize } from "@/lib/iptv/payments";
-import { extendSubscriptionAction } from "../devices/actions";
+import { extendTermAction } from "../devices/actions";
+import ExtendControl from "./devices/extend-control";
 import { DeviceStatus, formatDate, formatMoney, macSlug } from "./devices/parts";
 
 export const metadata = { title: "Dashboard" };
@@ -45,13 +46,8 @@ export default async function DashboardPage() {
           </span>
           <span className="admin-list-actions">
             <DeviceStatus device={device} />
-            {/* One-click renewal straight from the dashboard: this list is the daily job. */}
-            <form action={extendSubscriptionAction}>
-              <input type="hidden" name="mac" value={device.mac} />
-              <input type="hidden" name="months" value="1" />
-              <input type="hidden" name="back" value="/admin" />
-              <button className="button small secondary" type="submit">+1m</button>
-            </form>
+            {/* Renew straight from the dashboard: chasing this list is the daily job. */}
+            <ExtendControl mac={device.mac} back="/admin" action={extendTermAction} />
           </span>
         </div>)}</div>}
       </section>

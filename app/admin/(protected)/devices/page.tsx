@@ -2,15 +2,13 @@ import Link from "next/link";
 import { AlertTriangle, Ban, CalendarClock, MonitorSmartphone, Plus, Search, Wallet } from "lucide-react";
 import { DEVICE_FILTERS, filterDevices, listDevices, matchesFilter, type DeviceFilter } from "@/lib/iptv/admin-devices";
 import { revenueByDevice } from "@/lib/iptv/payments";
-import { createDeviceAction, extendSubscriptionAction, setBlockedAction } from "../../devices/actions";
+import { createDeviceAction, extendTermAction, setBlockedAction } from "../../devices/actions";
+import ExtendControl from "./extend-control";
 import { ActionNotice, DeviceStatus, formatDate, formatMoney, macSlug } from "./parts";
 
 type SearchParams = Promise<Record<string, string | undefined>>;
 
 export const metadata = { title: "Devices" };
-
-/** Shown inline in the table; the full 1-24 month range lives on the device page. */
-const QUICK_MONTHS = [1, 3, 6, 12];
 
 const FILTER_LABELS: Record<DeviceFilter, string> = {
   all: "All",
@@ -97,14 +95,9 @@ export default async function DevicesAdminPage({ searchParams }: { searchParams:
             ? <>{formatMoney(revenue.get(device.mac)!.total, revenue.get(device.mac)!.currency)}<small>{revenue.get(device.mac)!.count} payment(s)</small></>
             : <small>No payment</small>}</td>
           <td>
-            {/* One-click months: renewing is the routine job and a preset is harder to
-                get wrong than typing a date. */}
-            <div className="admin-preset-grid">{QUICK_MONTHS.map((months) => <form key={months} action={extendSubscriptionAction}>
-              <input type="hidden" name="mac" value={device.mac} />
-              <input type="hidden" name="months" value={months} />
-              <input type="hidden" name="back" value="/admin/devices" />
-              <button className="button small secondary" type="submit" title={`Add ${months} month(s)`}>{months === 12 ? "1y" : `${months}m`}</button>
-            </form>)}</div>
+            {/* Type the months, or nudge with − / +. Extending always adds to the current
+                end date, so renewing early costs the customer nothing. */}
+            <ExtendControl mac={device.mac} back="/admin/devices" action={extendTermAction} />
           </td>
           <td>
             <div className="admin-inline-actions">

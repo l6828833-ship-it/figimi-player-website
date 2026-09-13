@@ -220,6 +220,15 @@ export async function playlistContent(macValue: string, playlistId: string, acce
   if (!row || !row.enabled || !accessToken || row.access_token !== accessToken) throw new ApiError("Playlist not found.", 404);
   if (isExpired(row.expires_at as string | null)) throw new ApiError("This playlist has expired. Renew it to keep watching.", 410);
 
+  // The device is checked here as well as at provision time. A player keeps the playlist
+  // URL and re-fetches it directly, so without this a blocked or lapsed device would go
+  // on being served from the token it already holds.
+  const { data: device } = await client.from("iptv_devices").select("disabled,plan,subscription_expires_at").eq("device_mac", mac).maybeSingle();
+  if (device?.disabled) throw new ApiError("This device has been blocked. Contact support.", 403);
+  if (device && device.plan !== "lifetime" && isExpired(device.subscription_expires_at as string | null)) {
+    throw new ApiError("This subscription has expired. Renew it to keep watching.", 410);
+  }
+
   const { data: secretRow, error: secretError } = await client.from("iptv_device_playlist_secrets").select("ciphertext,iv,auth_tag,key_version").eq("playlist_id", playlistId).single();
   if (secretError || !secretRow) throw new Error("The playlist source is missing.");
   const secret = decryptJson<PlaylistSecret>({ ciphertext: secretRow.ciphertext, iv: secretRow.iv, authTag: secretRow.auth_tag, keyVersion: secretRow.key_version });

@@ -7,14 +7,14 @@ import { listPaymentsForDevice, PAYMENT_METHODS, PAYMENT_STATUSES, summarize } f
 import {
   deleteDeviceAction,
   expireNowAction,
-  extendDaysAction,
-  extendSubscriptionAction,
+  extendTermAction,
   setBlockedAction,
   setLabelAction,
   setLifetimeAction,
   setNotesAction,
 } from "../../../devices/actions";
 import { addPaymentAction, deletePaymentAction, setPaymentStatusAction } from "../../../payments/actions";
+import ExtendControl from "../extend-control";
 import { ActionNotice, DeviceStatus, formatDate, formatDateTime, formatMoney, macSlug } from "../parts";
 
 type Params = Promise<{ mac: string }>;
@@ -58,21 +58,10 @@ export default async function DeviceDetailPage({ params, searchParams }: { param
 
     <section className="admin-card">
       <h2>Subscription</h2>
-      <p className="fp-hint">Extending while the term is still running adds to the current end date, so renewing early costs the customer nothing.</p>
-      <div className="admin-preset-grid wide">{SUBSCRIPTION_PRESETS.map((preset) => <form key={preset.months} action={extendSubscriptionAction}>
-        <input type="hidden" name="mac" value={device.mac} />
-        <input type="hidden" name="months" value={preset.months} />
-        <input type="hidden" name="back" value={back} />
-        <button className="button small secondary" type="submit">+{preset.months === 24 ? "2y" : preset.months === 12 ? "1y" : `${preset.months}m`}</button>
-      </form>)}</div>
+      <p className="fp-hint">Type how much time to add, or nudge it with − and +. Extending while the term is still running adds to the current end date, so renewing early costs the customer nothing.</p>
+      <ExtendControl mac={device.mac} back={back} action={extendTermAction} withUnit submitLabel="Add to subscription" />
 
       <div className="admin-action-row">
-        <form action={extendDaysAction} className="admin-inline-form">
-          <input type="hidden" name="mac" value={device.mac} />
-          <input type="hidden" name="back" value={back} />
-          <input name="days" type="number" min={1} max={3650} placeholder="Days" required aria-label="Days to add" />
-          <button className="button small secondary" type="submit">Add days</button>
-        </form>
         <form action={setLifetimeAction}><input type="hidden" name="mac" value={device.mac} /><input type="hidden" name="back" value={back} /><button className="button small secondary" type="submit">Lifetime</button></form>
         <form action={expireNowAction}><input type="hidden" name="mac" value={device.mac} /><input type="hidden" name="back" value={back} /><button className="button small secondary" type="submit">End now</button></form>
         <form action={setBlockedAction}>
