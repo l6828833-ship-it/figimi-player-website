@@ -1054,6 +1054,7 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
     max-height: none;
     overflow: visible;
   }
+
   .fp-crypto-picker .fp-currency-menu {
     max-height: min(300px, calc(100dvh - 330px));
   }
