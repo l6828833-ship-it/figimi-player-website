@@ -40,7 +40,7 @@ export async function getAvailableCurrencies(): Promise<AvailableCurrency[]> {
   try {
     // Get enabled coins
     const coinsRes = await fetch(`${API_BASE}/merchant/coins`, { headers: authHeaders() });
-    const coinsData: any = await coinsRes.json();
+    const coinsData = await coinsRes.json() as { selectedCurrencies?: string[] };
     
     if (!coinsRes.ok) {
       console.error("[NOWPayments] coins error:", coinsRes.status, JSON.stringify(coinsData));
@@ -52,18 +52,19 @@ export async function getAvailableCurrencies(): Promise<AvailableCurrency[]> {
 
     // Get full currency metadata
     const metaRes = await fetch(`${API_BASE}/full-currencies`, { headers: authHeaders() });
-    const metaData: any = await metaRes.json();
+    const metaData = await metaRes.json() as { currencies?: unknown[] };
     const currencies = Array.isArray(metaData?.currencies) ? metaData.currencies : [];
 
     const meta: Record<string, { name: string; network: string | null; logo: string | null; enabled: boolean }> = {};
     for (const c of currencies) {
-      const code = String(c?.code ?? c?.ticker ?? "").toLowerCase();
+      const currency = c as Record<string, unknown>;
+      const code = String(currency?.code ?? currency?.ticker ?? "").toLowerCase();
       if (!code) continue;
       meta[code] = {
-        name: c?.name || code.toUpperCase(),
-        network: c?.network ? String(c.network).toUpperCase() : null,
-        logo: c?.logo_url ? `https://nowpayments.io${c.logo_url}` : null,
-        enabled: c?.enable !== false,
+        name: String(currency?.name || code.toUpperCase()),
+        network: currency?.network ? String(currency.network).toUpperCase() : null,
+        logo: currency?.logo_url ? `https://nowpayments.io${currency.logo_url}` : null,
+        enabled: currency?.enable !== false,
       };
     }
 
@@ -86,8 +87,9 @@ export async function getAvailableCurrencies(): Promise<AvailableCurrency[]> {
     }
 
     return result;
-  } catch (e: any) {
-    console.error("[NOWPayments] currencies exception:", e?.message || e);
+  } catch (e) {
+    const error = e as Error;
+    console.error("[NOWPayments] currencies exception:", error?.message || error);
     return [];
   }
 }
@@ -134,12 +136,12 @@ export async function createPayment(params: {
     body: JSON.stringify(payload),
   });
 
-  const data: any = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => ({})) as Record<string, unknown>;
   
   if (!res.ok || !data?.payment_id || !data?.pay_address) {
     console.error("[NOWPayments] create payment failed:", res.status, JSON.stringify(data));
-    const raw = data?.message || `NOWPayments error (${res.status})`;
-    const msg = /too small/i.test(String(raw))
+    const raw = String(data?.message || `NOWPayments error (${res.status})`);
+    const msg = /too small/i.test(raw)
       ? "This coin's minimum payment is higher than the order amount. Please choose another coin (e.g. USDT TRC20)."
       : raw;
     throw new Error(msg);
@@ -166,7 +168,7 @@ export async function getPaymentStatus(
 
   try {
     const res = await fetch(`${API_BASE}/payment/${paymentId}`, { headers: authHeaders() });
-    const data: any = await res.json();
+    const data = await res.json() as Record<string, unknown>;
     
     if (!res.ok) {
       console.error("[NOWPayments] status error:", res.status, JSON.stringify(data));
@@ -174,12 +176,13 @@ export async function getPaymentStatus(
     }
 
     return {
-      paymentStatus: data.payment_status,
+      paymentStatus: String(data.payment_status || ""),
       actuallyPaid: Number(data.actually_paid || 0),
       payAmount: Number(data.pay_amount || 0),
     };
-  } catch (e: any) {
-    console.error("[NOWPayments] status exception:", e?.message || e);
+  } catch (e) {
+    const error = e as Error;
+    console.error("[NOWPayments] status exception:", error?.message || error);
     return null;
   }
 }
@@ -187,7 +190,7 @@ export async function getPaymentStatus(
 /**
  * Verify IPN webhook signature
  */
-export function verifyIpnSignature(body: Record<string, any>, signature: string | undefined): boolean {
+export function verifyIpnSignature(body: Record<string, unknown>, signature: string | undefined): boolean {
   if (!signature || !process.env.NOWPAYMENTS_IPN_SECRET) return false;
 
   try {
@@ -200,13 +203,13 @@ export function verifyIpnSignature(body: Record<string, any>, signature: string 
 }
 
 // Recursively sort object keys (NOWPayments signs the sorted JSON)
-function sortObject(obj: any): any {
+function sortObject(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(sortObject);
   if (obj && typeof obj === "object") {
     return Object.keys(obj)
       .sort()
-      .reduce((acc: Record<string, any>, key) => {
-        acc[key] = sortObject(obj[key]);
+      .reduce((acc: Record<string, unknown>, key) => {
+        acc[key] = sortObject((obj as Record<string, unknown>)[key]);
         return acc;
       }, {});
   }

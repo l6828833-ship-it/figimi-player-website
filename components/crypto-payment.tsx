@@ -109,8 +109,9 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
         setPayment(data.payment);
         setPaymentStatus(data.payment.paymentStatus);
       }
-    } catch (error: any) {
-      alert(error?.message || "Failed to create payment");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create payment";
+      alert(message);
     } finally {
       setCreating(false);
     }

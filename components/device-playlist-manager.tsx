@@ -72,7 +72,6 @@ export function DevicePlaylistManager() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Playlist | null>(null);
   const [showBuySubscription, setShowBuySubscription] = useState(false);
