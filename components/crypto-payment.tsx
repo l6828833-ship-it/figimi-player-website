@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { CheckCircle2, ChevronDown, Copy, Loader2, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Copy, Loader2, MessageCircle, X } from "lucide-react";
 
 type AvailableCurrency = {
   ticker: string;
@@ -28,6 +28,9 @@ type Props = {
   onClose: () => void;
   onSuccess?: () => void;
 };
+
+const supportChatUrl = process.env.NEXT_PUBLIC_SUPPORT_CHAT_URL || "/contact";
+const supportChatIsExternal = /^https?:\/\//.test(supportChatUrl);
 
 export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }: Props) {
   const [currencies, setCurrencies] = useState<AvailableCurrency[]>([]);
@@ -176,6 +179,11 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
             Send exactly the amount below. This updates automatically once your payment is detected.
           </p>
 
+          <div className="fp-payment-intro">
+            <strong>How to complete your crypto payment</strong>
+            <p>Scan the QR code with your wallet, or copy the exact amount and wallet address below. Make sure you use the displayed network.</p>
+          </div>
+
           {/* QR Code */}
           <div className="fp-qr-container">
             <Image
@@ -244,6 +252,22 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
           <p className="fp-crypto-note">
             Keep this page open. Once your payment is confirmed, your subscription will be activated automatically.
           </p>
+
+          <div className="fp-payment-help">
+            <div className="fp-payment-help-copy">
+              <strong>Have a question about your payment?</strong>
+              <p>Contact our support team via chat and we’ll help you complete the payment.</p>
+            </div>
+            <a
+              className="fp-support-chat"
+              href={supportChatUrl}
+              target={supportChatIsExternal ? "_blank" : undefined}
+              rel={supportChatIsExternal ? "noreferrer" : undefined}
+            >
+              <MessageCircle size={17} />
+              Contact support via chat
+            </a>
+          </div>
         </div>
       </div>
     );
