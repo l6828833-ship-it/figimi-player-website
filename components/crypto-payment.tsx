@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { CheckCircle2, Copy, Loader2, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Copy, Loader2, X } from "lucide-react";
 
 type AvailableCurrency = {
   ticker: string;
@@ -33,11 +33,13 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
   const [currencies, setCurrencies] = useState<AvailableCurrency[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("");
+  const [currencyOpen, setCurrencyOpen] = useState(false);
   const [payment, setPayment] = useState<CreatedPayment | null>(null);
   const [creating, setCreating] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>("");
   const [isPaid, setIsPaid] = useState(false);
   const [copied, setCopied] = useState<string>("");
+  const currencyMenuRef = useRef<HTMLDivElement>(null);
 
   // Fetch available currencies
   useEffect(() => {
@@ -54,6 +56,27 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
     }
     fetchCurrencies();
   }, []);
+
+  // Close the coin menu when the user clicks outside it or presses Escape.
+  useEffect(() => {
+    if (!currencyOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (currencyMenuRef.current && !currencyMenuRef.current.contains(event.target as Node)) {
+        setCurrencyOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCurrencyOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [currencyOpen]);
 
   // Poll payment status
   useEffect(() => {
@@ -250,45 +273,86 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
           </div>
         ) : (
           <>
-            <div className="fp-currency-select-group">
-              <label htmlFor="fp-currency-select">Coin / network</label>
-              <select
-                id="fp-currency-select"
-                className="fp-currency-select"
-                value={selectedCurrency}
-                onChange={(event) => setSelectedCurrency(event.target.value)}
+            <div className="fp-currency-dropdown" ref={currencyMenuRef}>
+              <span className="fp-currency-label">Coin / network</span>
+              <button
+                type="button"
+                className={`fp-currency-trigger ${currencyOpen ? "open" : ""}`}
+                onClick={() => setCurrencyOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={currencyOpen}
               >
-                <option value="">Choose a coin and network</option>
-                {currencies.map((currency) => (
-                  <option key={currency.ticker} value={currency.ticker}>
-                    {currency.name}{currency.network ? ` (${currency.network})` : ""} · {currency.ticker.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedCurrencyDetails && (
-              <div className="fp-selected-currency">
-                {selectedCurrencyDetails.logoUrl ? (
-                  <Image
-                    src={selectedCurrencyDetails.logoUrl}
-                    alt=""
-                    width={42}
-                    height={42}
-                    className="fp-currency-logo"
-                  />
+                {selectedCurrencyDetails ? (
+                  <span className="fp-currency-trigger-content">
+                    {selectedCurrencyDetails.logoUrl ? (
+                      <Image
+                        src={selectedCurrencyDetails.logoUrl}
+                        alt=""
+                        width={34}
+                        height={34}
+                        className="fp-currency-logo"
+                      />
+                    ) : (
+                      <span className="fp-currency-placeholder" />
+                    )}
+                    <span className="fp-currency-trigger-text">
+                      <strong>{selectedCurrencyDetails.name}</strong>
+                      <span className="fp-currency-meta">
+                        {selectedCurrencyDetails.network && (
+                          <span className="fp-currency-network-badge">{selectedCurrencyDetails.network}</span>
+                        )}
+                        <span className="fp-currency-ticker">{selectedCurrencyDetails.ticker.toUpperCase()}</span>
+                      </span>
+                    </span>
+                  </span>
                 ) : (
-                  <div className="fp-currency-placeholder" />
+                  <span className="fp-currency-empty">Choose a coin and network</span>
                 )}
-                <div className="fp-currency-info">
-                  <span className="fp-currency-name">{selectedCurrencyDetails.name}</span>
-                  {selectedCurrencyDetails.network && (
-                    <span className="fp-currency-network">{selectedCurrencyDetails.network}</span>
-                  )}
-                  <span className="fp-currency-ticker">{selectedCurrencyDetails.ticker.toUpperCase()}</span>
+                <ChevronDown size={19} className="fp-currency-chevron" />
+              </button>
+
+              {currencyOpen && (
+                <div className="fp-currency-menu" role="listbox" aria-label="Available coins">
+                  {currencies.map((currency) => (
+                    <button
+                      key={currency.ticker}
+                      type="button"
+                      role="option"
+                      aria-selected={selectedCurrency === currency.ticker}
+                      className={`fp-currency-option ${selectedCurrency === currency.ticker ? "selected" : ""}`}
+                      onClick={() => {
+                        setSelectedCurrency(currency.ticker);
+                        setCurrencyOpen(false);
+                      }}
+                    >
+                      {currency.logoUrl ? (
+                        <Image
+                          src={currency.logoUrl}
+                          alt=""
+                          width={36}
+                          height={36}
+                          className="fp-currency-logo"
+                        />
+                      ) : (
+                        <span className="fp-currency-placeholder" />
+                      )}
+                      <span className="fp-currency-option-info">
+                        <strong>{currency.name}</strong>
+                        <span className="fp-currency-meta">
+                          {currency.network && (
+                            <span className="fp-currency-network-badge">{currency.network}</span>
+                          )}
+                          <span className="fp-currency-ticker">{currency.ticker.toUpperCase()}</span>
+                        </span>
+                      </span>
+                      {selectedCurrency === currency.ticker && (
+                        <CheckCircle2 size={19} className="fp-currency-check" />
+                      )}
+                    </button>
+                  ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <button
               className="fp-button primary wide"
