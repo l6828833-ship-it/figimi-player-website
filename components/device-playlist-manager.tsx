@@ -10,6 +10,7 @@ import {
   KeyRound,
   Link as LinkIcon,
   LogOut,
+  MessageCircle,
   Pencil,
   Plus,
   RefreshCw,
@@ -63,6 +64,8 @@ const formatMac = (value: string) => compactMac(value).match(/.{2}/g)?.join(":")
 const absolute = (path: string) => (typeof window === "undefined" ? path : `${window.location.origin}${path}`);
 const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—");
 const sourceLabel = (type: SourceType) => (type === "url" ? "M3U link" : type === "xtream" ? "Xtream login" : "Uploaded M3U");
+const supportChatUrl = process.env.NEXT_PUBLIC_SUPPORT_CHAT_URL || "/contact";
+const supportChatIsExternal = /^https?:\/\//.test(supportChatUrl);
 
 export function DevicePlaylistManager() {
   const [session, setSession] = useState<Session | null>(null);
@@ -566,6 +569,22 @@ export function DevicePlaylistManager() {
                     <span className="fp-payment-name">{method.name}</span>
                   </button>
                 ))}
+              </div>
+
+              <div className="fp-payment-help">
+                <div className="fp-payment-help-copy">
+                  <strong>Need help choosing a payment method?</strong>
+                  <p>Choose your plan and payment method. Crypto payments show the exact network, amount, QR code, and wallet address automatically.</p>
+                </div>
+                <a
+                  className="fp-support-chat"
+                  href={supportChatUrl}
+                  target={supportChatIsExternal ? "_blank" : undefined}
+                  rel={supportChatIsExternal ? "noreferrer" : undefined}
+                >
+                  <MessageCircle size={17} />
+                  Contact support via chat
+                </a>
               </div>
             </div>
           )}

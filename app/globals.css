@@ -1065,3 +1065,68 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
   top: auto;
   bottom: calc(100% + 8px);
 }
+
+
+/* Payment help and support chat */
+.fp-payment-help {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid #d8d1fb;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--purple-soft), #fff);
+}
+
+.fp-payment-help-copy {
+  min-width: 0;
+}
+
+.fp-payment-help-copy strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.fp-payment-help-copy p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.fp-support-chat {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid #cfc5fa;
+  border-radius: 9px;
+  color: var(--purple-dark);
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.fp-support-chat:hover {
+  border-color: var(--purple);
+  background: var(--purple-soft);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 620px) {
+  .fp-payment-help {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fp-support-chat {
+    justify-content: center;
+  }
+}
