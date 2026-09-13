@@ -68,6 +68,9 @@ export function DevicePlaylistManager() {
   const [showDetails, setShowDetails] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Playlist | null>(null);
+  const [showBuySubscription, setShowBuySubscription] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"1month" | "6months" | "12months" | "lifetime" | null>(null);
+  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
   const [name, setName] = useState("My playlist");
   const [sourceType, setSourceType] = useState<"url" | "xtream">("url");
@@ -222,6 +225,19 @@ export function DevicePlaylistManager() {
     };
   }, [closeDialog, showAdd]);
 
+  // Same for buy subscription modal
+  useEffect(() => {
+    if (!showBuySubscription) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") closeBuyModal(); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showBuySubscription]);
+
   function startEdit(playlist: Playlist) {
     setEditing(playlist);
     setShowAdd(true);
@@ -258,6 +274,37 @@ export function DevicePlaylistManager() {
 
   const expiring = device?.daysRemaining !== null && device?.daysRemaining !== undefined && device.daysRemaining <= 3 && !device.expired;
 
+  const pricingPlans = [
+    { id: "1month" as const, duration: "1 Month", price: "$3", originalPrice: null },
+    { id: "6months" as const, duration: "6 Months", price: "$6", originalPrice: null },
+    { id: "12months" as const, duration: "12 Months", price: "$8", originalPrice: null },
+    { id: "lifetime" as const, duration: "Lifetime", price: "$20", originalPrice: "$30" },
+  ];
+
+  const paymentMethods = [
+    { id: "crypto", name: "Cryptocurrency", icon: "₿" },
+    { id: "card", name: "Credit/Debit Card", icon: "💳" },
+    { id: "paypal", name: "PayPal", icon: "P" },
+  ];
+
+  const handlePlanSelect = (planId: typeof selectedPlan) => {
+    setSelectedPlan(planId);
+    setShowPaymentMethods(true);
+  };
+
+  const handlePaymentSelect = (methodId: string) => {
+    if (!selectedPlan) return;
+    const plan = pricingPlans.find(p => p.id === selectedPlan);
+    const method = paymentMethods.find(m => m.id === methodId);
+    alert(`Selected: ${plan?.duration} (${plan?.price}) via ${method?.name}\n\nPayment processing will be implemented here.`);
+  };
+
+  const closeBuyModal = () => {
+    setShowBuySubscription(false);
+    setSelectedPlan(null);
+    setShowPaymentMethods(false);
+  };
+
   return <div className="fp-dash">
     {/* Subscription first: it is the thing a paying customer checks before anything else. */}
     <section className={`fp-card fp-sub ${device?.expired ? "is-expired" : expiring ? "is-expiring" : "is-active"}`}>
@@ -282,17 +329,24 @@ export function DevicePlaylistManager() {
         </div>
       </div>
 
-      <button className="fp-more" type="button" aria-expanded={showDetails} onClick={() => setShowDetails(!showDetails)}>
-        More info <ChevronDown size={15} className={showDetails ? "flip" : ""} />
-      </button>
-      {showDetails && <dl className="fp-details">
-        <div><dt>MAC address</dt><dd className="fp-mono">{formatMac(session.mac)}</dd></div>
-        <div><dt>Plan</dt><dd>{device?.plan || "trial"}</dd></div>
-        <div><dt>Activated</dt><dd>{formatDate(device?.activatedAt ?? null)}</dd></div>
-        <div><dt>Playlists</dt><dd>{device?.activePlaylistCount ?? 0} active of {device?.playlistCount ?? 0}</dd></div>
-        <div><dt>Sign-ins</dt><dd>{device?.loginCount ?? 0}</dd></div>
-        <div><dt>Last sign-in</dt><dd>{device?.lastLoginAt ? new Date(device.lastLoginAt).toLocaleString() : "—"}</dd></div>
-      </dl>}
+      {/* Device details always visible */}
+      <div className="fp-device-info">
+        <div className="fp-device-row">
+          <span className="fp-device-label">MAC Address:</span>
+          <span className="fp-mono fp-device-value">{formatMac(session.mac)}</span>
+        </div>
+        <div className="fp-device-row">
+          <span className="fp-device-label">Plan:</span>
+          <span className="fp-device-value">{device?.plan || "trial"}</span>
+        </div>
+      </div>
+
+      {/* Buy Subscription button */}
+      <div className="fp-sub-actions">
+        <button className="fp-button primary wide" type="button" onClick={() => setShowBuySubscription(true)}>
+          Buy Subscription
+        </button>
+      </div>
     </section>
 
     {message && <div className={`notice ${message.type}`}>{message.text}</div>}
@@ -360,6 +414,84 @@ export function DevicePlaylistManager() {
             <button className="fp-button primary" type="submit" disabled={loading}>{loading ? "Saving…" : editing ? "Save changes" : "Add playlist"}</button>
           </div>
         </form>
+      </div>
+    </div>}
+
+    {/* Buy Subscription Modal */}
+    {showBuySubscription && <div className="fp-modal-backdrop" role="presentation" onClick={closeBuyModal}>
+      <div className="fp-modal fp-buy-modal" role="dialog" aria-modal="true" aria-labelledby="fp-buy-modal-title" onClick={(event) => event.stopPropagation()}>
+        <div className="fp-modal-head">
+          <div>
+            <span className="fp-eyebrow">💳 Buy Subscription</span>
+            <h3 id="fp-buy-modal-title">Choose Your Plan</h3>
+          </div>
+          <button className="fp-icon-button" type="button" onClick={closeBuyModal} aria-label="Close"><X size={18} /></button>
+        </div>
+
+        <div className="fp-modal-body">
+          {!showPaymentMethods ? (
+            <div className="fp-pricing-grid">
+              {pricingPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={`fp-pricing-card ${selectedPlan === plan.id ? "selected" : ""} ${plan.id === "lifetime" ? "featured" : ""}`}
+                  onClick={() => handlePlanSelect(plan.id)}
+                >
+                  <div className="fp-pricing-header">
+                    <h4>{plan.duration}</h4>
+                    {plan.id === "lifetime" && <span className="fp-badge">Best Value</span>}
+                  </div>
+                  <div className="fp-pricing-price">
+                    <span className="fp-price-main">{plan.price}</span>
+                    {plan.originalPrice && (
+                      <span className="fp-price-original">{plan.originalPrice}</span>
+                    )}
+                  </div>
+                  <button 
+                    className="fp-button primary wide" 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlanSelect(plan.id);
+                    }}
+                  >
+                    Select Plan
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="fp-payment-methods">
+              <button 
+                className="fp-button ghost" 
+                type="button" 
+                onClick={() => {
+                  setShowPaymentMethods(false);
+                  setSelectedPlan(null);
+                }}
+              >
+                ← Back to Plans
+              </button>
+              <div className="fp-selected-plan-info">
+                <p>Selected: <strong>{pricingPlans.find(p => p.id === selectedPlan)?.duration}</strong> - <strong>{pricingPlans.find(p => p.id === selectedPlan)?.price}</strong></p>
+              </div>
+              <h4>Choose Payment Method</h4>
+              <div className="fp-payment-grid">
+                {paymentMethods.map((method) => (
+                  <button
+                    key={method.id}
+                    className="fp-payment-card"
+                    type="button"
+                    onClick={() => handlePaymentSelect(method.id)}
+                  >
+                    <span className="fp-payment-icon">{method.icon}</span>
+                    <span className="fp-payment-name">{method.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>}
   </div>;

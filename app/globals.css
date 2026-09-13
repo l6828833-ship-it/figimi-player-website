@@ -330,3 +330,203 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
 @media(max-width:1050px){.admin-columns{grid-template-columns:1fr}}
 @media(max-width:760px){.admin-row-form,.admin-payment-form{grid-template-columns:1fr 1fr}.admin-payment-form .span-2{grid-column:1/-1}.admin-search{width:100%}.admin-search input{width:100%}}
 @media(max-width:520px){.admin-row-form,.admin-payment-form{grid-template-columns:1fr}.admin-metrics strong{font-size:1.3rem}}
+
+
+/* Device info and subscription purchase styles */
+.fp-device-info {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+}
+
+.fp-device-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fp-device-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.fp-device-value {
+  font-weight: 700;
+}
+
+.fp-sub-actions {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.fp-button.wide {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Buy subscription modal */
+.fp-buy-modal {
+  max-width: 800px;
+  width: 90%;
+}
+
+.fp-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.fp-pricing-card {
+  padding: 24px 18px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.fp-pricing-card:hover {
+  border-color: var(--purple);
+  box-shadow: 0 4px 12px rgba(105, 87, 217, 0.15);
+  transform: translateY(-2px);
+}
+
+.fp-pricing-card.selected {
+  border-color: var(--purple);
+  background: var(--purple-soft);
+}
+
+.fp-pricing-card.featured {
+  border-color: var(--purple-2);
+  background: linear-gradient(135deg, #f5f2ff, #fff);
+  box-shadow: 0 4px 16px rgba(149, 0, 255, 0.12);
+}
+
+.fp-pricing-header {
+  margin-bottom: 16px;
+}
+
+.fp-pricing-header h4 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+
+.fp-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--purple-2);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fp-pricing-price {
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.fp-price-main {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--purple);
+}
+
+.fp-price-original {
+  font-size: 1.2rem;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.fp-pricing-card .fp-button {
+  width: 100%;
+  min-height: 42px;
+  font-size: 0.9rem;
+}
+
+/* Payment methods */
+.fp-payment-methods {
+  margin-top: 16px;
+}
+
+.fp-selected-plan-info {
+  padding: 16px;
+  margin: 16px 0;
+  border-radius: 10px;
+  background: var(--purple-soft);
+  text-align: center;
+}
+
+.fp-selected-plan-info p {
+  margin: 0;
+  color: var(--ink);
+}
+
+.fp-payment-methods h4 {
+  margin: 20px 0 16px;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+.fp-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.fp-payment-card {
+  padding: 28px 20px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fp-payment-card:hover {
+  border-color: var(--purple);
+  box-shadow: 0 4px 12px rgba(105, 87, 217, 0.15);
+  transform: translateY(-2px);
+}
+
+.fp-payment-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.fp-payment-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+@media (max-width: 620px) {
+  .fp-pricing-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .fp-payment-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .fp-buy-modal {
+    width: 95%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+}
