@@ -149,12 +149,12 @@ export async function createPayment(params: {
 
   return {
     paymentId: String(data.payment_id),
-    payAddress: data.pay_address,
+    payAddress: String(data.pay_address),
     payAmount: Number(data.pay_amount),
-    payCurrency: data.pay_currency,
-    payinExtraId: data.payin_extra_id ?? null,
-    network: data.network ?? null,
-    paymentStatus: data.payment_status,
+    payCurrency: String(data.pay_currency),
+    payinExtraId: data.payin_extra_id == null ? null : String(data.payin_extra_id),
+    network: data.network == null ? null : String(data.network),
+    paymentStatus: String(data.payment_status || "waiting"),
   };
 }
 
