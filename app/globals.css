@@ -259,3 +259,11 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
 @keyframes fp-pop{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
 @media(max-width:620px){.fp-modal-actions{flex-direction:column-reverse}.fp-modal-actions .fp-button{width:100%}}
 @media(prefers-reduced-motion:reduce){.fp-modal-backdrop,.fp-modal{animation:none}}
+
+/* Admin: device subscription management */
+.admin-preset-grid{display:grid;grid-template-columns:repeat(5,minmax(34px,1fr));gap:4px;min-width:190px}
+.admin-preset-grid .button{width:100%;padding:5px 4px;font-size:.75rem}
+.admin-note-form{display:flex;gap:6px;margin-top:8px}
+.admin-note-form input{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:.78rem}
+.admin-table td .fp-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(max-width:900px){.admin-preset-grid{grid-template-columns:repeat(4,minmax(30px,1fr));min-width:150px}}

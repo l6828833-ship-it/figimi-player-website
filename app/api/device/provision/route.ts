@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyDeviceKey } from "@/lib/iptv/device-key";
-import { deviceSummary } from "@/lib/iptv/devices";
+import { deviceSummary, touchDevice } from "@/lib/iptv/devices";
 import { deviceSources } from "@/lib/iptv/playlists";
 import { ApiError, normalizeMac } from "@/lib/iptv/mac";
 import { apiError, readJson } from "@/lib/iptv/respond";
@@ -25,8 +25,13 @@ export async function POST(request: Request) {
     const mac = normalizeMac(input.mac);
     if (!verifyDeviceKey(mac, input.deviceKey)) throw new ApiError("That device key does not match this MAC address.", 401);
 
+    // First contact from the app starts the trial, so the 7 days count from real first
+    // use and cannot be reset by reinstalling.
+    const { blocked } = await touchDevice(mac);
+    if (blocked) throw new ApiError("This device has been blocked. Contact support.", 403);
+
     const device = await deviceSummary(mac);
-    if (device.disabled) throw new ApiError("This device has been disabled.", 403);
+    if (device.disabled) throw new ApiError("This device has been blocked. Contact support.", 403);
     // An expired subscription returns the status without sources, so the TV can show
     // "renew" rather than a generic empty screen.
     const sources = device.expired ? [] : await deviceSources(mac);

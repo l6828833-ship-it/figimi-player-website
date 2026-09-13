@@ -15,7 +15,7 @@ export async function loginDevice(macValue: string, deviceKey: string): Promise<
   const mac = normalizeMac(macValue);
   const client = createAdminClient();
   const { data: device } = await client.from("iptv_devices").select("device_mac,disabled,login_count,failed_attempts,locked_until").eq("device_mac", mac).maybeSingle();
-  if (device?.disabled) throw new ApiError("This device has been disabled. Contact support.", 403);
+  if (device?.disabled) throw new ApiError("This device has been blocked. Contact support.", 403);
 
   if (device?.locked_until && new Date(device.locked_until).getTime() > Date.now()) {
     const minutes = Math.ceil((new Date(device.locked_until).getTime() - Date.now()) / 60_000);

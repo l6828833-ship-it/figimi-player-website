@@ -32,6 +32,40 @@ export function daysUntil(value: string | null): number | null {
 /** A null expiry means no term was recorded, which is treated as active rather than expired. */
 export const isExpired = (value: string | null): boolean => (value ? new Date(value).getTime() <= Date.now() : false);
 
+/**
+ * Records this device and starts its trial the first time it is ever seen.
+ *
+ * The trial lives here rather than on the device precisely so deleting or reinstalling
+ * the app cannot restart it: the MAC is derived from the hardware, so the same TV comes
+ * back to the same row and the same end date. A blocked device stays blocked for the
+ * same reason.
+ *
+ * Returns null when the device is blocked, so callers can refuse without a second query.
+ */
+export async function touchDevice(macValue: string): Promise<{ blocked: boolean }> {
+  const mac = normalizeMac(macValue);
+  const client = createAdminClient();
+  const { data: existing } = await client
+    .from("iptv_devices")
+    .select("device_mac,disabled")
+    .eq("device_mac", mac)
+    .maybeSingle();
+
+  if (existing) return { blocked: Boolean(existing.disabled) };
+
+  const now = new Date();
+  // Nothing is overwritten for a known device: an admin's paid term must survive the
+  // app checking in.
+  await client.from("iptv_devices").insert({
+    device_mac: mac,
+    plan: "trial",
+    activated_at: now.toISOString(),
+    first_seen_at: now.toISOString(),
+    subscription_expires_at: new Date(now.getTime() + TRIAL_DAYS * 86_400_000).toISOString(),
+  });
+  return { blocked: false };
+}
+
 export async function deviceSummary(macValue: string): Promise<DeviceSummary> {
   const mac = normalizeMac(macValue);
   const client = createAdminClient();
