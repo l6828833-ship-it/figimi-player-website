@@ -1036,3 +1036,31 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
     height: 180px !important;
   }
 }
+
+
+/* The coin picker is an overlay: keep the panel from creating a second scrollbar. */
+.fp-crypto-picker {
+  max-height: none;
+  overflow: visible;
+}
+
+.fp-crypto-picker .fp-currency-menu {
+  max-height: min(360px, calc(100dvh - 360px));
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 620px) {
+  .fp-crypto-picker {
+    max-height: none;
+    overflow: visible;
+  }
+  .fp-crypto-picker .fp-currency-menu {
+    max-height: min(300px, calc(100dvh - 330px));
+  }
+}
+
+
+.fp-currency-menu.up {
+  top: auto;
+  bottom: calc(100% + 8px);
+}

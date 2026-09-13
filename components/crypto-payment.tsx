@@ -34,6 +34,7 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
   const [loading, setLoading] = useState(true);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("");
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  const [currencyMenuDirection, setCurrencyMenuDirection] = useState<"down" | "up">("down");
   const [payment, setPayment] = useState<CreatedPayment | null>(null);
   const [creating, setCreating] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string>("");
@@ -249,7 +250,7 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
   }
 
   return (
-    <div className="fp-crypto-payment">
+    <div className="fp-crypto-payment fp-crypto-picker">
       <div className="fp-crypto-header">
         <h3>Choose Cryptocurrency</h3>
         <button className="fp-icon-button" onClick={onClose}>
@@ -278,7 +279,17 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
               <button
                 type="button"
                 className={`fp-currency-trigger ${currencyOpen ? "open" : ""}`}
-                onClick={() => setCurrencyOpen((open) => !open)}
+                onClick={() => {
+                  const nextOpen = !currencyOpen;
+                  if (nextOpen) {
+                    const bounds = currencyMenuRef.current?.getBoundingClientRect();
+                    const estimatedMenuHeight = Math.min(360, window.innerHeight * 0.48);
+                    setCurrencyMenuDirection(
+                      bounds && bounds.bottom + estimatedMenuHeight > window.innerHeight - 20 ? "up" : "down"
+                    );
+                  }
+                  setCurrencyOpen(nextOpen);
+                }}
                 aria-haspopup="listbox"
                 aria-expanded={currencyOpen}
               >
@@ -312,7 +323,7 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
               </button>
 
               {currencyOpen && (
-                <div className="fp-currency-menu" role="listbox" aria-label="Available coins">
+                <div className={`fp-currency-menu ${currencyMenuDirection}`} role="listbox" aria-label="Available coins">
                   {currencies.map((currency) => (
                     <button
                       key={currency.ticker}
