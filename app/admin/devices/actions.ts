@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import { createDevice, deleteDevice, expireNow, extendDays, extendSubscription, setBlocked, setLabel, setLifetime, setNotes } from "@/lib/iptv/admin-devices";
+import { adjustSubscription, createDevice, deleteDevice, expireNow, setBlocked, setLabel, setLifetime, setNotes } from "@/lib/iptv/admin-devices";
 
 const text = (form: FormData, name: string) => String(form.get(name) || "").trim();
 
@@ -28,22 +28,20 @@ const fail = (form: FormData, error: unknown, fallback: string) =>
   redirect(`${target(form)}?error=${encodeURIComponent(error instanceof Error ? error.message : fallback)}`);
 
 /**
- * One action behind the extend stepper, in months or days.
+ * The one subscription control: a number of months, signed.
  *
- * It only ever adds time. Reducing a term stays on "End now", so a mistyped number can
- * never quietly cut a paying customer short.
+ * 1 adds a month, -1 takes one away. One field and one action rather than a row of
+ * presets, because the operator already knows the number they want.
  */
-export async function extendTermAction(form: FormData) {
+export async function adjustTermAction(form: FormData) {
   await requireAdmin();
-  const amount = Number(text(form, "amount"));
-  const unit = text(form, "unit") === "days" ? "days" : "months";
+  const months = Number(text(form, "months"));
   try {
-    if (unit === "days") await extendDays(text(form, "mac"), amount);
-    else await extendSubscription(text(form, "mac"), amount);
+    await adjustSubscription(text(form, "mac"), months);
   } catch (error) {
-    fail(form, error, "Could not extend the subscription.");
+    fail(form, error, "Could not change the subscription.");
   }
-  done(form, `${unit === "days" ? "days" : "extended"}=${encodeURIComponent(String(amount))}`);
+  done(form, `${months < 0 ? "reduced" : "extended"}=${encodeURIComponent(String(Math.abs(months)))}`);
 }
 
 export async function setLifetimeAction(form: FormData) {

@@ -165,30 +165,41 @@ export async function getDevice(macValue: string): Promise<AdminDeviceDetail | n
 }
 
 /**
- * Adds [months] to a device's term.
+ * Moves a device's term by [months]: positive adds, negative takes away.
  *
- * Extends from the current expiry when the subscription is still running, so renewing
- * early does not cost the customer the days they already paid for; an expired or new
+ * Adding works from the current expiry while the subscription is still running, so
+ * renewing early never costs the customer days they already paid for; an expired or new
  * device starts from today instead.
+ *
+ * Removing works from the current expiry too, and is floored at today — a term can be cut
+ * back to "ends now" but never to a date in the past, which would report a nonsense
+ * "expired 3 months ago" on the TV. Taking months off a lifetime device ends it now,
+ * since a lifetime has no date to subtract from.
  */
-export async function extendSubscription(macValue: string, months: number) {
+export async function adjustSubscription(macValue: string, months: number) {
   const mac = normalizeMac(macValue);
-  if (!Number.isInteger(months) || months < 1 || months > 120) throw new ApiError("Choose a duration between 1 and 120 months.", 400);
+  if (!Number.isInteger(months) || months === 0 || Math.abs(months) > 120) {
+    throw new ApiError("Enter a whole number of months from -120 to 120, and not 0.", 400);
+  }
 
   const client = createAdminClient();
-  const { data: device } = await client.from("iptv_devices").select("subscription_expires_at").eq("device_mac", mac).maybeSingle();
+  const { data: device } = await client.from("iptv_devices").select("subscription_expires_at,plan").eq("device_mac", mac).maybeSingle();
 
+  const now = new Date();
   const current = device?.subscription_expires_at ? new Date(device.subscription_expires_at as string) : null;
-  const start = current && current.getTime() > Date.now() ? current : new Date();
+  const start = current && current.getTime() > now.getTime() ? current : now;
   const next = new Date(start);
   next.setMonth(next.getMonth() + months);
+  const capped = next.getTime() < now.getTime() ? now : next;
 
   const { error } = await client.from("iptv_devices").upsert(
-    { device_mac: mac, plan: "paid", subscription_expires_at: next.toISOString() },
+    // Paying for months makes a device paid. Taking months off leaves the plan as it was,
+    // except for lifetime, which stops being a lifetime the moment it has an end date.
+    { device_mac: mac, plan: months > 0 ? "paid" : device?.plan === "lifetime" ? "paid" : device?.plan || "trial", subscription_expires_at: capped.toISOString() },
     { onConflict: "device_mac" },
   );
   if (error) throw error;
-  return next.toISOString();
+  return capped.toISOString();
 }
 
 export async function setLifetime(macValue: string) {
@@ -234,29 +245,6 @@ export async function deleteDevice(macValue: string) {
   await client.from("iptv_device_sessions").delete().eq("device_mac", mac);
   const { error } = await client.from("iptv_devices").delete().eq("device_mac", mac);
   if (error) throw error;
-}
-
-/**
- * Adds whole days to a term, for the cases a month preset does not cover: a few days of
- * goodwill after an outage, or a 10-day trial extension while a customer decides.
- */
-export async function extendDays(macValue: string, days: number) {
-  const mac = normalizeMac(macValue);
-  if (!Number.isInteger(days) || days < 1 || days > 3650) throw new ApiError("Choose between 1 and 3650 days.", 400);
-
-  const client = createAdminClient();
-  const { data: device } = await client.from("iptv_devices").select("subscription_expires_at,plan").eq("device_mac", mac).maybeSingle();
-  const current = device?.subscription_expires_at ? new Date(device.subscription_expires_at as string) : null;
-  const start = current && current.getTime() > Date.now() ? current : new Date();
-  const next = new Date(start.getTime() + days * 86_400_000);
-
-  const { error } = await client.from("iptv_devices").upsert(
-    // A trial that gets paid days becomes a paid device; a lifetime device keeps its plan.
-    { device_mac: mac, plan: device?.plan === "lifetime" ? "lifetime" : "paid", subscription_expires_at: next.toISOString() },
-    { onConflict: "device_mac" },
-  );
-  if (error) throw error;
-  return next.toISOString();
 }
 
 /**

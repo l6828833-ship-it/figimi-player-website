@@ -31,7 +31,7 @@ export function DeviceStatus({ device }: { device: StatusInput }) {
 export function ActionNotice({ params }: { params: Record<string, string | undefined> }) {
   const messages: [string, string][] = [
     ["extended", `Subscription extended by ${params.extended} month(s).`],
-    ["days", `Added ${params.days} day(s).`],
+    ["reduced", `Subscription cut by ${params.reduced} month(s).`],
     ["lifetime", "Device set to lifetime access."],
     ["expired", "Subscription ended."],
     ["blocked", "Device blocked and its sessions revoked."],

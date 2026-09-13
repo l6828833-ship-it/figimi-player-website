@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, Ban, CalendarClock, MonitorSmartphone, Plus, Search, Wallet } from "lucide-react";
 import { DEVICE_FILTERS, filterDevices, listDevices, matchesFilter, type DeviceFilter } from "@/lib/iptv/admin-devices";
 import { revenueByDevice } from "@/lib/iptv/payments";
-import { createDeviceAction, extendTermAction, setBlockedAction } from "../../devices/actions";
+import { adjustTermAction, createDeviceAction, setBlockedAction } from "../../devices/actions";
 import ExtendControl from "./extend-control";
 import { ActionNotice, DeviceStatus, formatDate, formatMoney, macSlug } from "./parts";
 
@@ -83,7 +83,7 @@ export default async function DevicesAdminPage({ searchParams }: { searchParams:
 
     <section className="admin-card">
       {!devices.length ? <p>{all.length ? "No devices match this view." : "No devices have contacted the service yet."}</p> : <div className="admin-table"><table>
-        <thead><tr><th>Device</th><th>Status</th><th>Expires</th><th>Paid</th><th>Extend</th><th /></tr></thead>
+        <thead><tr><th>Device</th><th>Status</th><th>Expires</th><th>Paid</th><th>Months (- to remove)</th><th /></tr></thead>
         <tbody>{devices.map((device) => <tr key={device.mac}>
           <td>
             <Link className="fp-mono admin-link" href={`/admin/devices/${macSlug(device.mac)}`}>{device.mac}</Link>
@@ -95,9 +95,9 @@ export default async function DevicesAdminPage({ searchParams }: { searchParams:
             ? <>{formatMoney(revenue.get(device.mac)!.total, revenue.get(device.mac)!.currency)}<small>{revenue.get(device.mac)!.count} payment(s)</small></>
             : <small>No payment</small>}</td>
           <td>
-            {/* Type the months, or nudge with − / +. Extending always adds to the current
+            {/* Months, signed: 1 adds one, -1 removes one. Adding works from the current
                 end date, so renewing early costs the customer nothing. */}
-            <ExtendControl mac={device.mac} back="/admin/devices" action={extendTermAction} />
+            <ExtendControl mac={device.mac} back="/admin/devices" action={adjustTermAction} />
           </td>
           <td>
             <div className="admin-inline-actions">

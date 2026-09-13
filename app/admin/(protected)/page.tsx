@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, Ban, CalendarClock, MonitorSmartphone, Wallet } from "lucide-react";
 import { listDevices, matchesFilter } from "@/lib/iptv/admin-devices";
 import { listPayments, summarize } from "@/lib/iptv/payments";
-import { extendTermAction } from "../devices/actions";
+import { adjustTermAction } from "../devices/actions";
 import ExtendControl from "./devices/extend-control";
 import { DeviceStatus, formatDate, formatMoney, macSlug } from "./devices/parts";
 
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
           <span className="admin-list-actions">
             <DeviceStatus device={device} />
             {/* Renew straight from the dashboard: chasing this list is the daily job. */}
-            <ExtendControl mac={device.mac} back="/admin" action={extendTermAction} />
+            <ExtendControl mac={device.mac} back="/admin" action={adjustTermAction} />
           </span>
         </div>)}</div>}
       </section>

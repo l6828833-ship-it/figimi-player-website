@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ApiError, normalizeMac } from "./mac";
-import { extendSubscription } from "./admin-devices";
+import { adjustSubscription } from "./admin-devices";
 
 export const PAYMENT_METHODS = ["cash", "card", "paypal", "bank", "crypto", "reseller", "other"] as const;
 export const PAYMENT_STATUSES = ["paid", "pending", "refunded"] as const;
@@ -178,7 +178,7 @@ export async function addPayment(input: PaymentInput): Promise<Payment> {
   // Recording the money and granting the time are one job for the operator, so the
   // subscription is extended here rather than leaving a paid device expired by mistake.
   // A pending or refunded row grants nothing.
-  if (input.extend && months > 0 && status === "paid") await extendSubscription(mac, months);
+  if (input.extend && months > 0 && status === "paid") await adjustSubscription(mac, months);
 
   return row(data as Record<string, unknown>);
 }

@@ -5,9 +5,9 @@ import { getDevice, SUBSCRIPTION_PRESETS } from "@/lib/iptv/admin-devices";
 import { deriveDeviceKey } from "@/lib/iptv/device-key";
 import { listPaymentsForDevice, PAYMENT_METHODS, PAYMENT_STATUSES, summarize } from "@/lib/iptv/payments";
 import {
+  adjustTermAction,
   deleteDeviceAction,
   expireNowAction,
-  extendTermAction,
   setBlockedAction,
   setLabelAction,
   setLifetimeAction,
@@ -58,8 +58,8 @@ export default async function DeviceDetailPage({ params, searchParams }: { param
 
     <section className="admin-card">
       <h2>Subscription</h2>
-      <p className="fp-hint">Type how much time to add, or nudge it with − and +. Extending while the term is still running adds to the current end date, so renewing early costs the customer nothing.</p>
-      <ExtendControl mac={device.mac} back={back} action={extendTermAction} withUnit submitLabel="Add to subscription" />
+      <p className="fp-hint">Months. <strong>1</strong> adds a month, <strong>-1</strong> removes one. Adding works from the current end date, so renewing early costs the customer nothing; removing stops at today.</p>
+      <ExtendControl mac={device.mac} back={back} action={adjustTermAction} submitLabel="Apply to subscription" />
 
       <div className="admin-action-row">
         <form action={setLifetimeAction}><input type="hidden" name="mac" value={device.mac} /><input type="hidden" name="back" value={back} /><button className="button small secondary" type="submit">Lifetime</button></form>
