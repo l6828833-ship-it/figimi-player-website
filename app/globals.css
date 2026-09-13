@@ -244,3 +244,18 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
   .fp-item-actions .fp-button{flex:1}
   .fp-row-head{align-items:flex-start;flex-direction:column}
 }
+
+/* Add/edit playlist dialog */
+.fp-modal-backdrop{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:20px;background:rgba(24,20,46,.55);backdrop-filter:blur(3px);animation:fp-fade .16s ease}
+.fp-modal{width:min(560px,100%);max-height:calc(100dvh - 40px);overflow:auto;border-radius:18px;background:#fff;box-shadow:0 30px 70px -20px rgba(20,16,44,.55);animation:fp-pop .18s ease}
+.fp-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px 0}
+.fp-modal-head h3{margin:8px 0 0;font-size:1.35rem}
+.fp-modal-body{padding:18px 22px 22px}
+.fp-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+.fp-icon-button{display:grid;place-items:center;width:36px;height:36px;flex:0 0 auto;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--muted);cursor:pointer}
+.fp-icon-button:hover{border-color:#c9c1ee;color:var(--ink);background:var(--soft)}
+.fp-hint{margin:0;padding:10px 12px;border-radius:10px;background:var(--soft);color:var(--muted);font-size:.85rem}
+@keyframes fp-fade{from{opacity:0}to{opacity:1}}
+@keyframes fp-pop{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
+@media(max-width:620px){.fp-modal-actions{flex-direction:column-reverse}.fp-modal-actions .fp-button{width:100%}}
+@media(prefers-reduced-motion:reduce){.fp-modal-backdrop,.fp-modal{animation:none}}

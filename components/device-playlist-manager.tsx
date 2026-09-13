@@ -175,9 +175,7 @@ export function DevicePlaylistManager() {
         await request("/api/device/playlists", { method: "POST", body: JSON.stringify(body) }, session.token);
         setMessage({ type: "success", text: "Playlist added. Press Check for playlist on your TV." });
       }
-      setEditing(null);
-      setShowAdd(false);
-      resetForm();
+      closeDialog();
       await refresh(session);
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not save the playlist." });
@@ -203,6 +201,26 @@ export function DevicePlaylistManager() {
       setMessage({ type: "success", text: "Playlist deleted." });
     } catch (error) { setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not delete the playlist." }); }
   }
+
+  const closeDialog = useCallback(() => {
+    setShowAdd(false);
+    setEditing(null);
+    resetForm();
+  }, []);
+
+  // Escape closes the dialog, and the page behind it stops scrolling while it is open —
+  // both expected of a modal, and their absence is what makes one feel broken.
+  useEffect(() => {
+    if (!showAdd) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") closeDialog(); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [closeDialog, showAdd]);
 
   function startEdit(playlist: Playlist) {
     setEditing(playlist);
@@ -282,29 +300,10 @@ export function DevicePlaylistManager() {
     <section className="fp-card">
       <div className="fp-row-head">
         <h2>My playlists</h2>
-        <button className="fp-button primary" type="button" onClick={() => { setEditing(null); resetForm(); setShowAdd(!showAdd); }}>
-          {showAdd && !editing ? <><X size={15} /> Cancel</> : <><Plus size={15} /> Add playlist</>}
+        <button className="fp-button primary" type="button" onClick={() => { setEditing(null); resetForm(); setShowAdd(true); }}>
+          <Plus size={15} /> Add playlist
         </button>
       </div>
-
-      {showAdd && <form className="fp-form fp-add" onSubmit={submitPlaylist}>
-        {editing && <p className="fp-editing">Editing <strong>{editing.name}</strong> · leave the source fields empty to keep the current one.<button type="button" className="fp-link" onClick={() => { setEditing(null); setShowAdd(false); resetForm(); }}>Cancel</button></p>}
-        <label>Playlist name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} required /></label>
-        <div className="fp-tabs" role="tablist" aria-label="Playlist source">
-          <button type="button" role="tab" aria-selected={sourceType === "url"} className={sourceType === "url" ? "active" : ""} onClick={() => setSourceType("url")}><LinkIcon size={15} /> M3U link</button>
-          <button type="button" role="tab" aria-selected={sourceType === "xtream"} className={sourceType === "xtream" ? "active" : ""} onClick={() => setSourceType("xtream")}><Server size={15} /> Xtream login</button>
-        </div>
-        {sourceType === "url"
-          ? <label>M3U link<input type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="http://provider.example/get.php?username=…" required={!editing} /></label>
-          : <>
-              <label>Xtream host<input type="url" value={host} onChange={(event) => setHost(event.target.value)} placeholder="http://panel.example.com" required={!editing} /></label>
-              <div className="fp-two">
-                <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" required={!editing} /></label>
-                <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required={!editing} /></label>
-              </div>
-            </>}
-        <button className="fp-button primary" type="submit" disabled={loading}>{loading ? "Saving…" : editing ? "Save changes" : "Add playlist"}</button>
-      </form>}
 
       {!playlists.length
         ? <p className="fp-empty">No playlists yet. Add one and press <strong>Check for playlist</strong> on your TV.</p>
@@ -328,5 +327,40 @@ export function DevicePlaylistManager() {
             </div>
           </li>)}</ul>}
     </section>
+
+    {showAdd && <div className="fp-modal-backdrop" role="presentation" onClick={closeDialog}>
+      {/* Stops a click inside the dialog from reaching the backdrop's close handler. */}
+      <div className="fp-modal" role="dialog" aria-modal="true" aria-labelledby="fp-modal-title" onClick={(event) => event.stopPropagation()}>
+        <div className="fp-modal-head">
+          <div>
+            <span className="fp-eyebrow">{editing ? <><Pencil size={14} /> Edit playlist</> : <><Plus size={14} /> New playlist</>}</span>
+            <h3 id="fp-modal-title">{editing ? editing.name : "Add a playlist"}</h3>
+          </div>
+          <button className="fp-icon-button" type="button" onClick={closeDialog} aria-label="Close"><X size={18} /></button>
+        </div>
+
+        <form className="fp-form fp-modal-body" onSubmit={submitPlaylist}>
+          {editing && <p className="fp-hint">Leave the source fields empty to keep the current source.</p>}
+          <label>Playlist name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} autoFocus required /></label>
+          <div className="fp-tabs" role="tablist" aria-label="Playlist source">
+            <button type="button" role="tab" aria-selected={sourceType === "url"} className={sourceType === "url" ? "active" : ""} onClick={() => setSourceType("url")}><LinkIcon size={15} /> M3U link</button>
+            <button type="button" role="tab" aria-selected={sourceType === "xtream"} className={sourceType === "xtream" ? "active" : ""} onClick={() => setSourceType("xtream")}><Server size={15} /> Xtream login</button>
+          </div>
+          {sourceType === "url"
+            ? <label>M3U link<input type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="http://provider.example/get.php?username=…" required={!editing} /><small>A panel link works too; the credentials inside it are detected automatically.</small></label>
+            : <>
+                <label>Xtream host<input type="url" value={host} onChange={(event) => setHost(event.target.value)} placeholder="http://panel.example.com" required={!editing} /></label>
+                <div className="fp-two">
+                  <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" required={!editing} /></label>
+                  <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required={!editing} /></label>
+                </div>
+              </>}
+          <div className="fp-modal-actions">
+            <button className="fp-button" type="button" onClick={closeDialog}>Cancel</button>
+            <button className="fp-button primary" type="submit" disabled={loading}>{loading ? "Saving…" : editing ? "Save changes" : "Add playlist"}</button>
+          </div>
+        </form>
+      </div>
+    </div>}
   </div>;
 }
