@@ -3,23 +3,60 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import { deleteDevice, expireNow, extendSubscription, setBlocked, setLifetime, setNotes } from "@/lib/iptv/admin-devices";
+import {
+  createDevice,
+  deleteDevice,
+  expireNow,
+  extendDays,
+  extendSubscription,
+  setBlocked,
+  setLabel,
+  setLifetime,
+  setNotes,
+} from "@/lib/iptv/admin-devices";
 
 const text = (form: FormData, name: string) => String(form.get(name) || "").trim();
-const fail = (error: unknown, fallback: string) =>
-  redirect(`/admin/devices?error=${encodeURIComponent(error instanceof Error ? error.message : fallback)}`);
+
+/**
+ * Where to land after the action. Every form carries the page it was submitted from so
+ * the same action serves both the devices list and a single device page without the
+ * operator being bounced back to the top of the list after each click.
+ */
+function target(form: FormData): string {
+  const back = text(form, "back");
+  return back.startsWith("/admin/devices") ? back : "/admin/devices";
+}
+
+const done = (form: FormData, query: string) => {
+  const to = target(form);
+  revalidatePath("/admin/devices");
+  revalidatePath(to);
+  redirect(`${to}?${query}`);
+};
+
+const fail = (form: FormData, error: unknown, fallback: string) =>
+  redirect(`${target(form)}?error=${encodeURIComponent(error instanceof Error ? error.message : fallback)}`);
 
 export async function extendSubscriptionAction(form: FormData) {
   await requireAdmin();
-  const mac = text(form, "mac");
   const months = Number(text(form, "months"));
   try {
-    await extendSubscription(mac, months);
+    await extendSubscription(text(form, "mac"), months);
   } catch (error) {
-    fail(error, "Could not extend the subscription.");
+    fail(form, error, "Could not extend the subscription.");
   }
-  revalidatePath("/admin/devices");
-  redirect(`/admin/devices?extended=${encodeURIComponent(String(months))}`);
+  done(form, `extended=${encodeURIComponent(String(months))}`);
+}
+
+export async function extendDaysAction(form: FormData) {
+  await requireAdmin();
+  const days = Number(text(form, "days"));
+  try {
+    await extendDays(text(form, "mac"), days);
+  } catch (error) {
+    fail(form, error, "Could not add days to the subscription.");
+  }
+  done(form, `days=${encodeURIComponent(String(days))}`);
 }
 
 export async function setLifetimeAction(form: FormData) {
@@ -27,10 +64,9 @@ export async function setLifetimeAction(form: FormData) {
   try {
     await setLifetime(text(form, "mac"));
   } catch (error) {
-    fail(error, "Could not set lifetime access.");
+    fail(form, error, "Could not set lifetime access.");
   }
-  revalidatePath("/admin/devices");
-  redirect("/admin/devices?lifetime=1");
+  done(form, "lifetime=1");
 }
 
 export async function expireNowAction(form: FormData) {
@@ -38,10 +74,9 @@ export async function expireNowAction(form: FormData) {
   try {
     await expireNow(text(form, "mac"));
   } catch (error) {
-    fail(error, "Could not end the subscription.");
+    fail(form, error, "Could not end the subscription.");
   }
-  revalidatePath("/admin/devices");
-  redirect("/admin/devices?expired=1");
+  done(form, "expired=1");
 }
 
 export async function setBlockedAction(form: FormData) {
@@ -50,10 +85,9 @@ export async function setBlockedAction(form: FormData) {
   try {
     await setBlocked(text(form, "mac"), blocked);
   } catch (error) {
-    fail(error, "Could not change the block state.");
+    fail(form, error, "Could not change the block state.");
   }
-  revalidatePath("/admin/devices");
-  redirect(`/admin/devices?${blocked ? "blocked" : "unblocked"}=1`);
+  done(form, `${blocked ? "blocked" : "unblocked"}=1`);
 }
 
 export async function deleteDeviceAction(form: FormData) {
@@ -61,8 +95,9 @@ export async function deleteDeviceAction(form: FormData) {
   try {
     await deleteDevice(text(form, "mac"));
   } catch (error) {
-    fail(error, "Could not delete the device.");
+    fail(form, error, "Could not delete the device.");
   }
+  // A deleted device has no page left to return to.
   revalidatePath("/admin/devices");
   redirect("/admin/devices?deleted=1");
 }
@@ -72,8 +107,30 @@ export async function setNotesAction(form: FormData) {
   try {
     await setNotes(text(form, "mac"), text(form, "notes"));
   } catch (error) {
-    fail(error, "Could not save the note.");
+    fail(form, error, "Could not save the note.");
+  }
+  done(form, "noted=1");
+}
+
+export async function setLabelAction(form: FormData) {
+  await requireAdmin();
+  try {
+    await setLabel(text(form, "mac"), text(form, "label"));
+  } catch (error) {
+    fail(form, error, "Could not save the customer name.");
+  }
+  done(form, "labelled=1");
+}
+
+export async function createDeviceAction(form: FormData) {
+  await requireAdmin();
+  const months = Number(text(form, "months") || "0");
+  let mac = "";
+  try {
+    mac = await createDevice(text(form, "mac"), months, text(form, "label"));
+  } catch (error) {
+    fail(form, error, "Could not add the device.");
   }
   revalidatePath("/admin/devices");
-  redirect("/admin/devices?noted=1");
+  redirect(`/admin/devices/${mac.replace(/:/g, "-")}?created=1`);
 }

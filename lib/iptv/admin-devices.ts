@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ApiError, normalizeMac } from "./mac";
-import { daysUntil, isExpired } from "./devices";
+import { daysUntil, isExpired, TRIAL_DAYS } from "./devices";
 
 /** Offered as buttons in the admin panel, so the common terms need no date picking. */
 export const SUBSCRIPTION_PRESETS = [
@@ -22,6 +22,7 @@ export const SUBSCRIPTION_PRESETS = [
 
 export type AdminDevice = {
   mac: string;
+  label: string | null;
   plan: string;
   subscriptionExpiresAt: string | null;
   daysRemaining: number | null;
@@ -34,10 +35,77 @@ export type AdminDevice = {
   playlistCount: number;
 };
 
-export async function listDevices(): Promise<AdminDevice[]> {
+/** The tabs above the devices table; "expiring" is the list an operator chases for renewals. */
+export const DEVICE_FILTERS = ["all", "active", "expiring", "trial", "expired", "blocked", "lifetime"] as const;
+export type DeviceFilter = (typeof DEVICE_FILTERS)[number];
+
+const SELECT = "device_mac,label,plan,subscription_expires_at,disabled,login_count,last_login_at,first_seen_at,notes";
+
+function toAdminDevice(device: Record<string, unknown>, playlistCount: number): AdminDevice {
+  const expiresAt = (device.subscription_expires_at as string | null) ?? null;
+  return {
+    mac: device.device_mac as string,
+    label: (device.label as string | null) ?? null,
+    plan: (device.plan as string) || "trial",
+    subscriptionExpiresAt: expiresAt,
+    daysRemaining: daysUntil(expiresAt),
+    expired: isExpired(expiresAt),
+    blocked: Boolean(device.disabled),
+    loginCount: Number(device.login_count || 0),
+    lastLoginAt: (device.last_login_at as string | null) ?? null,
+    firstSeenAt: (device.first_seen_at as string | null) ?? null,
+    notes: (device.notes as string | null) ?? null,
+    playlistCount,
+  };
+}
+
+export function matchesFilter(device: AdminDevice, filter: DeviceFilter): boolean {
+  switch (filter) {
+    case "active":
+      return !device.blocked && !device.expired;
+    case "expiring":
+      return !device.blocked && !device.expired && device.plan !== "lifetime" && device.daysRemaining !== null && device.daysRemaining <= 7;
+    case "trial":
+      return device.plan === "trial" && !device.blocked;
+    case "expired":
+      return device.expired && !device.blocked;
+    case "blocked":
+      return device.blocked;
+    case "lifetime":
+      return device.plan === "lifetime";
+    default:
+      return true;
+  }
+}
+
+/**
+ * Search and filter applied in memory rather than in SQL.
+ *
+ * The table is one row per TV sold, so a single read serves the list, the filter counts,
+ * and the dashboard at once; querying per tab would mean several round trips for the
+ * same rows. Search deliberately ignores MAC separators so `001a79` finds `00:1A:79:…`.
+ */
+export function filterDevices(devices: AdminDevice[], options: { search?: string; filter?: DeviceFilter } = {}): AdminDevice[] {
+  let rows = devices;
+
+  const search = options.search?.trim().toLowerCase();
+  if (search) {
+    const compact = search.replace(/[.\-:\s]/g, "");
+    rows = rows.filter((device) =>
+      device.mac.toLowerCase().replace(/:/g, "").includes(compact) ||
+      (device.label || "").toLowerCase().includes(search) ||
+      (device.notes || "").toLowerCase().includes(search));
+  }
+
+  const filter = options.filter || "all";
+  if (filter !== "all") rows = rows.filter((device) => matchesFilter(device, filter));
+  return rows;
+}
+
+export async function listDevices(options: { search?: string; filter?: DeviceFilter } = {}): Promise<AdminDevice[]> {
   const client = createAdminClient();
   const [{ data: devices, error }, { data: playlists }] = await Promise.all([
-    client.from("iptv_devices").select("device_mac,plan,subscription_expires_at,disabled,login_count,last_login_at,first_seen_at,notes").order("last_login_at", { ascending: false, nullsFirst: false }),
+    client.from("iptv_devices").select(SELECT).order("last_login_at", { ascending: false, nullsFirst: false }),
     client.from("iptv_device_playlists").select("device_mac"),
   ]);
   if (error) throw error;
@@ -45,22 +113,55 @@ export async function listDevices(): Promise<AdminDevice[]> {
   const counts = new Map<string, number>();
   for (const row of playlists || []) counts.set(row.device_mac, (counts.get(row.device_mac) || 0) + 1);
 
-  return (devices || []).map((device) => {
-    const expiresAt = (device.subscription_expires_at as string | null) ?? null;
-    return {
-      mac: device.device_mac as string,
-      plan: (device.plan as string) || "trial",
-      subscriptionExpiresAt: expiresAt,
-      daysRemaining: daysUntil(expiresAt),
-      expired: isExpired(expiresAt),
-      blocked: Boolean(device.disabled),
-      loginCount: Number(device.login_count || 0),
-      lastLoginAt: (device.last_login_at as string | null) ?? null,
-      firstSeenAt: (device.first_seen_at as string | null) ?? null,
-      notes: (device.notes as string | null) ?? null,
-      playlistCount: counts.get(device.device_mac as string) || 0,
-    };
-  });
+  const rows = (devices || []).map((device) => toAdminDevice(device, counts.get(device.device_mac as string) || 0));
+  return filterDevices(rows, options);
+}
+
+export type AdminDeviceDetail = AdminDevice & {
+  activatedAt: string | null;
+  lockedUntil: string | null;
+  sessionCount: number;
+  playlists: {
+    id: string;
+    name: string;
+    sourceType: string;
+    enabled: boolean;
+    accessCount: number;
+    lastAccessedAt: string | null;
+    expiresAt: string | null;
+    createdAt: string;
+  }[];
+};
+
+export async function getDevice(macValue: string): Promise<AdminDeviceDetail | null> {
+  const mac = normalizeMac(macValue);
+  const client = createAdminClient();
+  const [{ data: device }, { data: playlists }, { count: sessionCount }] = await Promise.all([
+    client.from("iptv_devices").select(`${SELECT},activated_at,locked_until`).eq("device_mac", mac).maybeSingle(),
+    // Never selects the encrypted source or access token: playlist secrets must not
+    // reach the admin browser.
+    client.from("iptv_device_playlists").select("id,name,source_type,enabled,access_count,last_accessed_at,expires_at,created_at").eq("device_mac", mac).order("created_at", { ascending: false }),
+    client.from("iptv_device_sessions").select("token_hash", { count: "exact", head: true }).eq("device_mac", mac),
+  ]);
+  if (!device) return null;
+
+  const rows = playlists || [];
+  return {
+    ...toAdminDevice(device, rows.length),
+    activatedAt: (device.activated_at as string | null) ?? null,
+    lockedUntil: (device.locked_until as string | null) ?? null,
+    sessionCount: sessionCount || 0,
+    playlists: rows.map((playlist) => ({
+      id: playlist.id as string,
+      name: playlist.name as string,
+      sourceType: playlist.source_type as string,
+      enabled: Boolean(playlist.enabled),
+      accessCount: Number(playlist.access_count || 0),
+      lastAccessedAt: (playlist.last_accessed_at as string | null) ?? null,
+      expiresAt: (playlist.expires_at as string | null) ?? null,
+      createdAt: playlist.created_at as string,
+    })),
+  };
 }
 
 /**
@@ -72,7 +173,7 @@ export async function listDevices(): Promise<AdminDevice[]> {
  */
 export async function extendSubscription(macValue: string, months: number) {
   const mac = normalizeMac(macValue);
-  if (!Number.isInteger(months) || months < 1 || months > 24) throw new ApiError("Choose a duration between 1 and 24 months.", 400);
+  if (!Number.isInteger(months) || months < 1 || months > 120) throw new ApiError("Choose a duration between 1 and 120 months.", 400);
 
   const client = createAdminClient();
   const { data: device } = await client.from("iptv_devices").select("subscription_expires_at").eq("device_mac", mac).maybeSingle();
@@ -132,6 +233,65 @@ export async function deleteDevice(macValue: string) {
   await client.from("iptv_device_playlists").delete().eq("device_mac", mac);
   await client.from("iptv_device_sessions").delete().eq("device_mac", mac);
   const { error } = await client.from("iptv_devices").delete().eq("device_mac", mac);
+  if (error) throw error;
+}
+
+/**
+ * Adds whole days to a term, for the cases a month preset does not cover: a few days of
+ * goodwill after an outage, or a 10-day trial extension while a customer decides.
+ */
+export async function extendDays(macValue: string, days: number) {
+  const mac = normalizeMac(macValue);
+  if (!Number.isInteger(days) || days < 1 || days > 3650) throw new ApiError("Choose between 1 and 3650 days.", 400);
+
+  const client = createAdminClient();
+  const { data: device } = await client.from("iptv_devices").select("subscription_expires_at,plan").eq("device_mac", mac).maybeSingle();
+  const current = device?.subscription_expires_at ? new Date(device.subscription_expires_at as string) : null;
+  const start = current && current.getTime() > Date.now() ? current : new Date();
+  const next = new Date(start.getTime() + days * 86_400_000);
+
+  const { error } = await client.from("iptv_devices").upsert(
+    // A trial that gets paid days becomes a paid device; a lifetime device keeps its plan.
+    { device_mac: mac, plan: device?.plan === "lifetime" ? "lifetime" : "paid", subscription_expires_at: next.toISOString() },
+    { onConflict: "device_mac" },
+  );
+  if (error) throw error;
+  return next.toISOString();
+}
+
+/**
+ * Registers a TV before it ever contacts the service, so a customer can be sold a term
+ * in the shop and find the app already activated on first boot.
+ */
+export async function createDevice(macValue: string, months: number, label?: string) {
+  const mac = normalizeMac(macValue);
+  const client = createAdminClient();
+  const { data: existing } = await client.from("iptv_devices").select("device_mac").eq("device_mac", mac).maybeSingle();
+  if (existing) throw new ApiError("That device already exists. Open it to change its subscription.", 409);
+
+  const now = new Date();
+  const expires = new Date(now);
+  if (months > 0) expires.setMonth(expires.getMonth() + months);
+  else expires.setTime(now.getTime() + TRIAL_DAYS * 86_400_000);
+
+  const { error } = await client.from("iptv_devices").insert({
+    device_mac: mac,
+    label: label?.trim().slice(0, 120) || null,
+    plan: months > 0 ? "paid" : "trial",
+    activated_at: now.toISOString(),
+    first_seen_at: now.toISOString(),
+    subscription_expires_at: expires.toISOString(),
+  });
+  if (error) throw error;
+  return mac;
+}
+
+/** The customer name shown beside the MAC; a MAC alone is impossible to recognise. */
+export async function setLabel(macValue: string, label: string) {
+  const mac = normalizeMac(macValue);
+  const { error } = await createAdminClient()
+    .from("iptv_devices")
+    .upsert({ device_mac: mac, label: label.trim().slice(0, 120) || null }, { onConflict: "device_mac" });
   if (error) throw error;
 }
 
