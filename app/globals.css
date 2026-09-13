@@ -919,6 +919,47 @@ body:has(.admin-shell)>.site-header,body:has(.admin-shell)>.site-footer,body:has
 }
 
 /* Payment Fields */
+.fp-payment-asset-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.fp-payment-asset-item {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.fp-payment-asset-item span,
+.fp-payment-asset-item small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fp-payment-asset-item strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-payment-asset-item small {
+  margin-top: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
 .fp-payment-field {
   margin-bottom: 18px;
 }

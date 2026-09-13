@@ -184,6 +184,18 @@ export function CryptoPayment({ deviceMac, planId, amount, onClose, onSuccess }:
             <p>Scan the QR code with your wallet, or copy the exact amount and wallet address below. Make sure you use the displayed network.</p>
           </div>
 
+          <div className="fp-payment-asset-summary">
+            <div className="fp-payment-asset-item">
+              <span>Coin</span>
+              <strong>{selectedCurrencyDetails?.name || payment.payCurrency.toUpperCase()}</strong>
+              <small>{payment.payCurrency.toUpperCase()}</small>
+            </div>
+            <div className="fp-payment-asset-item">
+              <span>Network</span>
+              <strong>{payment.network || selectedCurrencyDetails?.network || "Not specified"}</strong>
+            </div>
+          </div>
+
           {/* QR Code */}
           <div className="fp-qr-container">
             <Image
